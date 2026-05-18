@@ -1,1 +1,12 @@
-# この作品について
+## 概要
+Node.js + MySQL + Ollama のDocker環境を構築しました
+
+## 環境
+- Node.js 20
+- MySQL 8.0
+- Ollama (qwen2.5:3b)
+
+## チームメンバーの起動手順
+1. `.env` ファイルを作成（内容は別途共有）
+2. `docker-compose up -d` を実行
+3. `http://localhost:3000` にアクセス
