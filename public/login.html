@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <meta name="theme-color" content="#3B82F6" />
+  <title>Revino — ログイン</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <main id="screen">
+      <section class="auth-screen">
+        <div class="auth-top">
+          <div class="auth-logo"></div>
+          <div class="auth-app-name">Revino</div>
+          <div class="auth-screen-name">Welcome back. Let's keep learning.</div>
+        </div>
+
+        <div class="auth-card">
+          <form id="loginForm">
+            <div class="form-group">
+              <label class="form-label" for="email">📧 メールアドレス</label>
+              <input
+                class="form-input"
+                id="email"
+                type="email"
+                placeholder="example@email.com"
+                autocomplete="email"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="password">🔒 パスワード</label>
+              <input
+                class="form-input"
+                id="password"
+                type="password"
+                placeholder="パスワードを入力"
+                autocomplete="current-password"
+                required
+              />
+            </div>
+
+            <div id="message" class="alert alert-error hidden"></div>
+
+            <button class="btn btn-primary" type="submit">ログイン ›</button>
+          </form>
+
+          <button class="btn btn-outline mt12" type="button" onclick="location.href='/register.html'">
+            アカウントを作成
+          </button>
+
+          <div class="form-link mt12">
+            アカウントをお持ちでない方は
+            <span onclick="location.href='/register.html'">新規登録</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/js/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <meta name="theme-color" content="#3B82F6" />
+  <title>Revino — アカウント作成</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <main id="screen">
+      <section class="auth-screen">
+        <div class="auth-top">
+          <div class="auth-logo"></div>
+          <div class="auth-app-name">Revino</div>
+          <div class="auth-screen-name">Create your account</div>
+        </div>
+
+        <div class="auth-card">
+          <form id="registerForm">
+            <div class="form-group">
+              <label class="form-label" for="username">👤 名前</label>
+              <input
+                class="form-input"
+                id="username"
+                type="text"
+                placeholder="例：田中 太郎"
+                autocomplete="name"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="email">📧 メールアドレス</label>
+              <input
+                class="form-input"
+                id="email"
+                type="email"
+                placeholder="example@email.com"
+                autocomplete="email"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="password">🔒 パスワード（6文字以上）</label>
+              <input
+                class="form-input"
+                id="password"
+                type="password"
+                placeholder="パスワードを入力"
+                autocomplete="new-password"
+                minlength="6"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="profile">📝 プロフィール</label>
+              <textarea
+                class="form-input profile-textarea"
+                id="profile"
+                placeholder="例：数学が好きです"
+              ></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">🏷️ ユーザータグ</label>
+
+              <div class="tag-editor-row">
+                <input
+                  class="form-input"
+                  id="tagInput"
+                  type="text"
+                  maxlength="20"
+                  placeholder="例：数学"
+                />
+                <button class="btn btn-outline" id="addTagButton" type="button">追加</button>
+              </div>
+
+              <div id="selectedTags" class="selected-tags mt12"></div>
+              <p class="profile-readonly-note">タグは1個ずつ追加できます。最大10個までです。</p>
+            </div>
+
+            <div id="message" class="alert alert-error hidden"></div>
+
+            <button class="btn btn-gold" type="submit">🎉 アカウントを作成</button>
+          </form>
+
+          <div class="form-link mt12">
+            すでにアカウントをお持ちの方は
+            <span onclick="location.href='/login.html'">ログイン</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/js/register.js"></script>
+</body>
+</html>

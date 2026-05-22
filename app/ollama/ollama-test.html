@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Revino Ollama Test</title>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 760px;
+      margin: 40px auto;
+      padding: 0 20px;
+      line-height: 1.7;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    .note {
+      color: #666;
+      margin-bottom: 24px;
+    }
+
+    button {
+      padding: 10px 20px;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px 5px 5px 0;
+    }
+
+    pre {
+      background: #f4f4f4;
+      padding: 15px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    input {
+      padding: 10px;
+      width: 100%;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Revino Ollama Test</h1>
+
+  <p class="note">
+    これはOllama接続確認用の画面です。Revino本体機能とは別扱いです。
+  </p>
+
+  <h2>サーバー確認</h2>
+  <button onclick="checkServer()">Revinoサーバー確認</button>
+
+  <h2>Ollama接続確認</h2>
+  <button onclick="checkOllama()">Ollama確認</button>
+
+  <h2>Ollamaチャット</h2>
+
+  <label>
+    モデル
+    <input type="text" id="model" value="qwen2.5:3b" />
+  </label>
+
+  <label>
+    プロンプト
+    <input type="text" id="prompt" placeholder="質問を入力してください" />
+  </label>
+
+  <button onclick="sendChat()">送信</button>
+
+  <pre id="result">結果がここに表示されます</pre>
+
+  <script>
+    const result = document.getElementById("result");
+
+    function show(data) {
+      result.textContent =
+        typeof data === "string" ? data : JSON.stringify(data, null, 2);
+    }
+
+    async function requestJson(url, options = {}) {
+      const response = await fetch(url, options);
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw data;
+      }
+
+      return data;
+    }
+
+    async function checkServer() {
+      try {
+        show("確認中...");
+        const data = await requestJson("/api/health");
+        show(data);
+      } catch (error) {
+        show(error);
+      }
+    }
+
+    async function checkOllama() {
+      try {
+        show("Ollama確認中...");
+        const data = await requestJson("/api/ollama/health");
+        show(data);
+      } catch (error) {
+        show(error);
+      }
+    }
+
+    async function sendChat() {
+      const prompt = document.getElementById("prompt").value;
+      const model = document.getElementById("model").value || "qwen2.5:3b";
+
+      if (!prompt.trim()) {
+        show("プロンプトを入力してください。");
+        return;
+      }
+
+      try {
+        show("送信中...");
+
+        const data = await requestJson("/api/ollama/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            prompt,
+            model
+          })
+        });
+
+        show(data.response || data);
+      } catch (error) {
+        show(error);
+      }
+    }
+  </script>
+</body>
+</html>
