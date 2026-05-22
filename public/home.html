@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <meta name="theme-color" content="#3B82F6" />
+  <title>Revino — ホーム</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <main id="screen">
+      <section class="home-top fade-in">
+        <div class="home-top-bar">
+          <button class="home-menu-btn" type="button" onclick="location.href='/mypage'" aria-label="メニュー">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="4" y1="7" x2="20" y2="7"/>
+              <line x1="4" y1="12" x2="20" y2="12"/>
+              <line x1="4" y1="17" x2="14" y2="17"/>
+            </svg>
+          </button>
+
+          <div class="home-brand">Revino</div>
+
+          <button class="home-notif-btn" type="button" id="notifButton" aria-label="通知">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+            </svg>
+            <div class="notif-dot"></div>
+          </button>
+        </div>
+
+        <div class="home-greeting-block">
+          <div class="home-greet-line">
+            やあ、<span id="homeUserName">お兄ちゃん</span>さん！
+            <span class="wave">👋</span>
+          </div>
+          <div class="home-greet-sub">今日も復習をがんばろう。</div>
+        </div>
+
+        <article class="cal-card">
+          <div class="cal-head">
+            <div class="cal-head-title">学習カレンダー</div>
+            <div class="cal-head-month" id="calendarMonth">----</div>
+          </div>
+
+          <div class="cal-streak">
+            <div class="cal-streak-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M8.5 14.5c0 2 1.5 3.5 3.5 3.5s3.5-1.5 3.5-3.5c0-3-2.5-3-2.5-6 0 0 0-2-2-2-2 0-2 2-2 2 0 3-2.5 3-2.5 6z"
+                  fill="currentColor"
+                  fill-opacity=".25"
+                />
+                <path d="M12 3c0 3 4 4 4 9a4 4 0 0 1-8 0c0-2 1-3 2-4 1-1 2-3 2-5z"/>
+              </svg>
+            </div>
+
+            <div class="cal-streak-text">
+              <div class="cal-streak-big"><strong>14</strong>日連続学習中</div>
+              <div class="cal-streak-sub">この調子でがんばろう！</div>
+            </div>
+
+            <div class="cal-streak-bar">
+              <div class="cal-streak-bar-fill" style="width: 86%;"></div>
+            </div>
+          </div>
+
+          <div class="cal-week" id="calendarWeek"></div>
+
+          <div class="cal-legend">
+            <div class="cal-legend-item">
+              <span class="cal-legend-dot done"></span>
+              完了
+            </div>
+            <div class="cal-legend-item">
+              <span class="cal-legend-dot today"></span>
+              今日
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="home-body">
+        <div class="section-header">
+          <div class="section-title">セット一覧</div>
+          <button class="section-link" type="button">すべて見る ›</button>
+        </div>
+
+        <article class="mini-set-card">
+          <div class="mini-set-icon color-0">🌱</div>
+          <div class="mini-set-info">
+            <div class="mini-set-title">サンプル問題集</div>
+            <div class="mini-set-meta">8問</div>
+            <div class="mini-set-bar-bg">
+              <div class="mini-set-bar-fill" style="width: 72%;"></div>
+            </div>
+          </div>
+          <div class="mini-set-pct">72%</div>
+          <div class="mini-set-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 6 15 12 9 18"/>
+            </svg>
+          </div>
+        </article>
+
+        <article class="mini-set-card">
+          <div class="mini-set-icon color-1">📖</div>
+          <div class="mini-set-info">
+            <div class="mini-set-title">英単語チェック</div>
+            <div class="mini-set-meta">20問</div>
+            <div class="mini-set-bar-bg">
+              <div class="mini-set-bar-fill" style="width: 58%;"></div>
+            </div>
+          </div>
+          <div class="mini-set-pct warn">58%</div>
+          <div class="mini-set-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 6 15 12 9 18"/>
+            </svg>
+          </div>
+        </article>
+
+        <div class="home-action-row">
+          <button class="btn btn-outline action-add" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+              stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            セット追加
+          </button>
+
+          <button class="btn btn-primary" type="button">
+            今すぐ復習
+            <span class="arrow-fab">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+            </span>
+          </button>
+        </div>
+
+        <div class="section-header" style="margin-top: 24px;">
+          <div class="section-title">クイックモード</div>
+        </div>
+
+        <div class="learn-shortcut-row">
+          <button class="learn-shortcut-card" type="button">
+            <div class="learn-shortcut-icon blue">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                stroke="#1D4ED8" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M12 20h9"/>
+                <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+            </div>
+            <div class="learn-shortcut-label">個人学習</div>
+            <div class="learn-shortcut-arrow">›</div>
+          </button>
+
+          <button class="learn-shortcut-card" type="button">
+            <div class="learn-shortcut-icon red">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                stroke="#DC2626" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/>
+                <line x1="13" y1="19" x2="19" y2="13"/>
+                <line x1="16" y1="16" x2="20" y2="20"/>
+                <line x1="19" y1="21" x2="21" y2="19"/>
+              </svg>
+            </div>
+            <div class="learn-shortcut-label">対戦モード</div>
+            <div class="learn-shortcut-arrow">›</div>
+          </button>
+        </div>
+
+        <div class="static-bottom-space"></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <a class="nav-btn active" href="/home" data-screen="home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 10.5 12 3l9 7.5"/>
+          <path d="M5 9.5V21h14V9.5"/>
+          <path d="M10 21v-6h4v6"/>
+        </svg>
+        <span class="nav-label">ホーム</span>
+      </a>
+
+      <a class="nav-btn" href="#" data-screen="materials">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7l9-4 9 4-9 4-9-4z"/>
+          <path d="M3 12l9 4 9-4"/>
+          <path d="M3 17l9 4 9-4"/>
+        </svg>
+        <span class="nav-label">セット</span>
+      </a>
+
+      <a class="nav-btn nav-center-btn" href="#" data-screen="upload">
+        <div class="nav-center-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </div>
+      </a>
+
+      <a class="nav-btn" href="#" data-screen="ranking">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 9H4a2 2 0 0 1-2-2V5h4"/>
+          <path d="M18 9h2a2 2 0 0 0 2-2V5h-4"/>
+          <path d="M6 5h12v6a6 6 0 0 1-12 0V5z"/>
+          <path d="M9 21h6"/>
+          <path d="M12 17v4"/>
+        </svg>
+        <span class="nav-label">ランキング</span>
+      </a>
+
+      <a class="nav-btn" href="/mypage" data-screen="mypage">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M4 21c0-4 4-7 8-7s8 3 8 7"/>
+        </svg>
+        <span class="nav-label">マイページ</span>
+      </a>
+    </nav>
+  </div>
+
+  <script src="/js/home.js"></script>
+</body>
+</html>
