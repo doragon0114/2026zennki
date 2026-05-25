@@ -1,17 +1,3 @@
 {
-  "users": [
-    {
-      "userId": "user_51f162768a",
-      "username": "いいいい",
-      "profile": "古典が好きです",
-      "userTagIds": [
-        "tag_47bd9a2d"
-      ],
-      "email": "aaa@gmail.com",
-      "salt": "734da713d796d47b95e0b8084448e70e",
-      "passwordHash": "14ef7ced6043488e41864076c725dfc3c9cd6fd234e76349925732066094be6aa3c704168104078c2923c01447dfd8f4eea92d3b87fc81907993edbabd007675",
-      "createdAt": "2026-05-20T02:28:22.367Z",
-      "updatedAt": "2026-05-20T03:13:32.066Z"
-    }
-  ]
+  "users": []
 }
