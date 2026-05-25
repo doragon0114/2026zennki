@@ -11,3 +11,7 @@ Node.js + MySQL + Ollama のDocker環境を構築しました
 2. `docker-compose up -d` を実行
 3. `docker compose exec ollama ollama pull qwen2.5:3b`を実行
 4. `http://localhost:3000` にアクセス
+
+## ollama確認方法
+1. 'http://localhost:3000/ollama-test.html'
+
