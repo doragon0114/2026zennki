@@ -2,14 +2,11 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 
-const requireLogin = require("../middleware/requireLogin");
-
 const router = express.Router();
 
 const publicPath = path.join(__dirname, "../public");
 const ollamaPath = path.join(__dirname, "../ollama");
 
-// ===== 画面送信用ヘルパー =====
 function sendPublicPage(fileName) {
   return (req, res) => {
     const filePath = path.join(publicPath, fileName);
@@ -42,62 +39,54 @@ function sendOllamaPage(fileName) {
   };
 }
 
-// ==================================================
-// 通常画面
-// ==================================================
-
-// アプリ開始
-router.get("/", (req, res) => {
-  res.redirect("/splash.html");
-});
-
-router.get("/splash", (req, res) => {
-  res.redirect("/splash.html");
-});
-
-// 認証画面
-router.get("/login", (req, res) => {
-  res.redirect("/login.html");
-});
-
-router.get("/register", (req, res) => {
-  res.redirect("/register.html");
-});
+const sendIndex = sendPublicPage("index.html");
 
 // ==================================================
-// ログイン必須画面
+// SPA入口
+// ==================================================
+// どの画面URLでも index.html を返す。
+// 実際の画面切り替えは public/js/shared.js の navigate() が行う。
 // ==================================================
 
-// ホーム
-router.get(["/home", "/home.html"], requireLogin, sendPublicPage("home.html"));
+router.get("/", sendIndex);
+router.get("/index.html", sendIndex);
 
-// マイページ
-router.get(["/mypage", "/mypage.html"], requireLogin, sendPublicPage("mypage.html"));
+// 認証系
+router.get("/splash", sendIndex);
+router.get("/splash.html", sendIndex);
+router.get("/login", sendIndex);
+router.get("/login.html", sendIndex);
+router.get("/register", sendIndex);
+router.get("/register.html", sendIndex);
 
-// 対戦機能用
-router.get(
-  ["/battle-start", "/battle-start.html"],
-  requireLogin,
-  sendPublicPage("battle-start.html")
-);
+// メイン画面
+router.get("/home", sendIndex);
+router.get("/home.html", sendIndex);
+router.get("/materials", sendIndex);
+router.get("/upload", sendIndex);
+router.get("/ranking", sendIndex);
+router.get("/mypage", sendIndex);
 
-router.get(
-  ["/battle", "/battle.html"],
-  requireLogin,
-  sendPublicPage("battle.html")
-);
+// 学習系
+router.get("/question-set", sendIndex);
+router.get("/question-edit", sendIndex);
+router.get("/study", sendIndex);
+router.get("/study-result", sendIndex);
 
-router.get(
-  ["/battle-result", "/battle-result.html"],
-  requireLogin,
-  sendPublicPage("battle-result.html")
-);
+// 対戦系
+router.get("/battle", sendIndex);
+router.get("/battle.html", sendIndex);
+router.get("/battle-start", sendIndex);
+router.get("/battle-start.html", sendIndex);
+router.get("/battle-result", sendIndex);
+router.get("/battle-result.html", sendIndex);
+router.get("/battle-history", sendIndex);
+router.get("/battle-history.html", sendIndex);
 
-// ==================================================
-// Ollama確認画面
-// featuresには入れず app/ollama にまとめる
-// ==================================================
+// プロフィール系
+router.get("/profile-edit", sendIndex);
 
+// Ollama確認画面だけは app/ollama 側のHTMLを返す
 if (process.env.ENABLE_OLLAMA_TOOLS !== "false") {
   router.get("/ollama-test", sendOllamaPage("ollama-test.html"));
   router.get("/ollama-test.html", sendOllamaPage("ollama-test.html"));

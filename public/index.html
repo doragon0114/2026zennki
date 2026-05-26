@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<!-- =====================================================
+     Revino — スマート復習アプリ
+     メインHTMLファイル
+
+     このファイルの役割：
+     - アプリの「骨格」（大まかな構造）を定義する
+     - 実際の画面内容はすべて app.js が動的に生成する
+     - デザインは style.css で定義されている
+===================================================== -->
+<html lang="ja">
+<head>
+  <!-- 文字コードを UTF-8 に指定（日本語を正しく表示するため） -->
+  <meta charset="UTF-8">
+  <!-- スマートフォン向けの表示設定
+       user-scalable=no：ユーザーによるピンチ拡大縮小を無効化
+       viewport-fit=cover：ノッチ付きスマホでも画面端まで表示 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <!-- ブラウザのアドレスバーやステータスバーの色を Revino ブルーに設定 -->
+  <meta name="theme-color" content="#3B82F6">
+  <title>Revino — Smart review.</title>
+  <!-- デザイン用のCSSファイルを読み込む -->
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+
+<!-- =====================================================
+     アプリ全体を囲むコンテナ
+     最大幅 480px でスマートフォンアプリのような見た目を実現する
+===================================================== -->
+<div id="app">
+
+  <!-- 各画面のコンテンツがここに動的に挿入される
+       app.js の navigate() 関数が innerHTML を書き換えることで画面が切り替わる -->
+  <div id="screen"></div>
+
+  <!-- =====================================================
+       ボトムナビゲーションバー
+       ログイン後の主要4画面で表示される。
+       ログイン・登録・スプラッシュ画面では "hidden" クラスで非表示になる。
+  ===================================================== -->
+  <nav id="bottom-nav" class="bottom-nav hidden">
+
+    <!-- ホームボタン：ホーム画面（カレンダー・セット一覧）へ移動 -->
+    <button class="nav-btn" data-screen="home" onclick="navigate('home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
+      <span class="nav-label">ホーム</span>
+    </button>
+
+    <!-- セットボタン：問題セット（教材）一覧画面へ移動 -->
+    <button class="nav-btn" data-screen="materials" onclick="navigate('materials')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/></svg>
+      <span class="nav-label">セット</span>
+    </button>
+
+    <!-- 中央の雷ボタン：資料アップロード画面へ移動
+         他のボタンより大きく・浮き上がったデザインで目立たせている -->
+    <button class="nav-btn nav-center-btn" data-screen="upload" onclick="navigate('upload')">
+      <div class="nav-center-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+    </button>
+
+    <!-- ランキングボタン：ユーザーランキング画面へ移動 -->
+    <button class="nav-btn" data-screen="ranking" onclick="navigate('ranking')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4a2 2 0 0 1-2-2V5h4"/><path d="M18 9h2a2 2 0 0 0 2-2V5h-4"/><path d="M6 5h12v6a6 6 0 0 1-12 0V5z"/><path d="M9 21h6"/><path d="M12 17v4"/></svg>
+      <span class="nav-label">ランキング</span>
+    </button>
+
+    <!-- マイページボタン：プロフィール・対戦履歴・設定画面へ移動 -->
+    <button class="nav-btn" data-screen="mypage" onclick="navigate('mypage')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
+      <span class="nav-label">マイページ</span>
+    </button>
+
+  </nav>
+</div>
+
+<!-- アプリのメインロジックを読み込む
+     担当ごとにファイルを分割しています。編集する担当のファイルのみ変更してください。
+
+     読み込み順序（依存関係があるため順番を変えないでください）:
+       1. shared.js   … 共通データ・状態管理・ユーティリティ（全担当共通）
+       2. auth.js     … ログイン・会員登録画面（DB担当）
+       3. home.js     … ホーム画面（フロントエンド担当）
+       4. upload.js   … 資料アップロード・AI解析画面（AI担当）
+       5. materials.js… セット一覧・問題編集画面（DB担当）
+       6. study.js    … 個人学習・結果画面（フロントエンド担当）
+       7. battle.js   … 対戦モード全般（DB担当）
+       8. social.js   … マイページ・プロフィール・ランキング（DB担当） -->
+<script src="/js/shared.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/home.js"></script>
+<script src="/js/upload.js"></script>
+<script src="/js/materials.js"></script>
+<script src="/js/study.js"></script>
+<script src="/js/battle.js"></script>
+<script src="/js/social.js"></script>
+</body>
+</html>
