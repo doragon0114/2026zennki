@@ -23,7 +23,7 @@ function applyAuthUser(user) {
     email: user.email,
     profile: user.profile || "",
     userTags: Array.isArray(user.userTags) ? user.userTags : [],
-    avatar: user.avatar || "🐧",
+    avatar: localStorage.getItem("revino_avatar") || user.avatar || "🐧",
     points: user.points || 0,
     wins: user.wins || 0,
     totalStudied: user.totalStudied || 0,
