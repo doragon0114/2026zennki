@@ -1,63 +1,74 @@
 const WebSocket = require("ws");
 const crypto = require("crypto");
 
-const { enqueueOrMatch, removeWaitingPlayer } = require("./battleMatcher");
-
 const {
-  SUBJECTS,
-  findQuestionListBySubject,
+  getSubjectLabel,
   buildBattleQuestions,
-  judgeAnswer,
-  getCorrectAnswerText,
+  toPublicQuestion
 } = require("./battleQuestionRepository");
 
-const {
-  createAnswerList,
-  recordCorrectId,
-} = require("./battleAnswerRepository");
-
+const waitingPlayers = new Map();
+const playerRooms = new Map();
 const activeRooms = new Map();
+
+function createId(prefix) {
+  return `${prefix}_${crypto.randomBytes(5).toString("hex")}`;
+}
+
+function send(ws, type, payload = {}) {
+  if (ws.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  ws.send(JSON.stringify({
+    type,
+    ...payload
+  }));
+}
+
+function broadcast(room, type, payload = {}) {
+  room.players.forEach(player => {
+    send(player.ws, type, payload);
+  });
+}
+
+function getMatchKey(player) {
+  return `${player.subject}:${player.age}`;
+}
 
 function initBattleWebSocket(server) {
   const wss = new WebSocket.Server({
     server,
-    path: "/ws/battle",
+    path: "/ws/battle"
   });
 
   wss.on("connection", ws => {
     const player = {
-      id: crypto.randomUUID(),
-      name: "ゲスト",
-      age: null,
-      subject: null,
+      id: createId("player"),
       ws,
-      roomId: null,
+      name: "ゲスト",
+      age: 15,
+      subject: "math",
+      avatar: "🐧"
     };
 
     send(ws, "connected", {
-      playerId: player.id,
-      message: "WebSocketに接続しました。",
+      playerId: player.id
     });
 
     ws.on("message", raw => {
-      let data;
-
       try {
-        data = JSON.parse(raw.toString());
+        const data = JSON.parse(raw.toString());
+        handleMessage(player, data);
       } catch {
-        sendError(ws, "JSONの形式が正しくありません。");
-        return;
+        send(ws, "error", {
+          message: "通信データの形式が正しくありません"
+        });
       }
-
-      handleMessage(player, data);
     });
 
     ws.on("close", () => {
-      cleanupPlayer(player);
-    });
-
-    ws.on("error", () => {
-      cleanupPlayer(player);
+      handleLeave(player);
     });
   });
 
@@ -70,381 +81,313 @@ function handleMessage(player, data) {
       handleJoin(player, data);
       break;
 
-    case "buzz":
-      handleBuzz(player);
-      break;
-
     case "submitAnswer":
       handleSubmitAnswer(player, data);
       break;
 
+    case "readyNext":
+      handleReadyNext(player);
+      break;
+
     case "leave":
-      cleanupPlayer(player);
+      handleLeave(player);
       break;
 
     default:
-      sendError(player.ws, "不明なメッセージタイプです。");
+      send(player.ws, "error", {
+        message: "未対応の操作です"
+      });
       break;
   }
 }
 
 function handleJoin(player, data) {
-  const name = sanitizeName(data.name);
-  const subject = data.subject;
-  const age = Number(data.age);
+  player.name = String(data.name || "ゲスト").trim().slice(0, 20);
+  player.age = Number(data.age || 15);
+  player.subject = data.subject || "math";
+  player.avatar = data.avatar || "🐧";
 
-  if (!SUBJECTS[subject]) {
-    sendError(player.ws, "教科が正しくありません。");
-    return;
-  }
-
-  if (!Number.isInteger(age) || age < 1 || age > 120) {
-    sendError(player.ws, "年齢が正しくありません。");
-    return;
-  }
-
-  removeWaitingPlayer(player.id);
-
-  if (player.roomId) {
-    leaveRoom(player);
-  }
-
-  player.name = name;
-  player.subject = subject;
-  player.age = age;
-
-  send(player.ws, "joined", {
-    playerId: player.id,
-    name: player.name,
-    subject,
-    subjectLabel: SUBJECTS[subject],
-    age,
-  });
-
-  const result = enqueueOrMatch(player);
-
-  if (result.status === "waiting") {
-    send(player.ws, "waiting", {
-      message: "同じ教科・同じ年齢の相手を待っています。",
-      subject,
-      subjectLabel: SUBJECTS[subject],
-      age,
+  if (!Number.isInteger(player.age) || player.age < 1 || player.age > 120) {
+    send(player.ws, "error", {
+      message: "年齢が正しくありません"
     });
     return;
   }
 
-  createRoom(player, result.opponent);
-}
+  const key = getMatchKey(player);
+  const waiting = waitingPlayers.get(key);
 
-function createRoom(playerA, playerB) {
-  const questionList = findQuestionListBySubject(playerA.subject);
+  send(player.ws, "joined", {
+    playerId: player.id,
+    name: player.name,
+    age: player.age,
+    subject: player.subject,
+    subjectLabel: getSubjectLabel(player.subject)
+  });
 
-  if (!questionList) {
-    sendError(playerA.ws, "問題リストが見つかりません。");
-    sendError(playerB.ws, "問題リストが見つかりません。");
+  if (waiting && waiting.ws.readyState === WebSocket.OPEN && waiting.id !== player.id) {
+    waitingPlayers.delete(key);
+    createRoom(waiting, player);
     return;
   }
 
-  const roomId = crypto.randomUUID();
+  waitingPlayers.set(key, player);
 
-  const answerListA = createAnswerList({
-    questionListId: questionList.questionListId,
-    userId: playerA.id,
+  send(player.ws, "waiting", {
+    message: `${getSubjectLabel(player.subject)} / ${player.age}歳で相手を探しています。`
   });
+}
 
-  const answerListB = createAnswerList({
-    questionListId: questionList.questionListId,
-    userId: playerB.id,
-  });
+function createRoom(playerA, playerB) {
+  const roomId = createId("room");
+  const questions = buildBattleQuestions(playerA.subject);
+
+  if (questions.length < 5) {
+    send(playerA.ws, "error", {
+      message: "この教科の問題が不足しています"
+    });
+    send(playerB.ws, "error", {
+      message: "この教科の問題が不足しています"
+    });
+    return;
+  }
 
   const room = {
     id: roomId,
     subject: playerA.subject,
     age: playerA.age,
-    questionListId: questionList.questionListId,
     players: [playerA, playerB],
-    answerListIds: {
-      [playerA.id]: answerListA.answerListId,
-      [playerB.id]: answerListB.answerListId,
-    },
+    questions,
+    current: -1,
     scores: {
       [playerA.id]: 0,
-      [playerB.id]: 0,
+      [playerB.id]: 0
     },
-    questions: buildBattleQuestions(playerA, playerB, playerA.subject),
-    currentIndex: -1,
-    lockedBy: null,
-    finished: false,
+    answers: {},
+    readyNext: new Set(),
+    timer: null,
+    finished: false
   };
 
-  playerA.roomId = roomId;
-  playerB.roomId = roomId;
-
   activeRooms.set(roomId, room);
+  playerRooms.set(playerA.id, roomId);
+  playerRooms.set(playerB.id, roomId);
 
   broadcast(room, "matched", {
     roomId,
     subject: room.subject,
-    subjectLabel: SUBJECTS[room.subject],
+    subjectLabel: getSubjectLabel(room.subject),
     age: room.age,
-    players: room.players.map(player => {
-      return {
-        id: player.id,
-        name: player.name,
-      };
-    }),
-    answerListIds: room.answerListIds,
-    message: "対戦相手が見つかりました。",
+    players: room.players.map(player => ({
+      id: player.id,
+      name: player.name,
+      avatar: player.avatar
+    }))
   });
 
   setTimeout(() => {
-    nextQuestion(roomId);
-  }, 1000);
+    nextQuestion(room);
+  }, 800);
 }
 
-function nextQuestion(roomId) {
-  const room = activeRooms.get(roomId);
-
+function nextQuestion(room) {
   if (!room || room.finished) {
     return;
   }
 
-  room.currentIndex += 1;
-  room.lockedBy = null;
+  clearQuestionTimer(room);
 
-  if (room.currentIndex >= room.questions.length) {
+  room.current += 1;
+  room.answers = {};
+  room.readyNext = new Set();
+
+  if (room.current >= room.questions.length) {
     finishRoom(room);
     return;
   }
 
-  const question = room.questions[room.currentIndex];
+  const question = room.questions[room.current];
 
   broadcast(room, "question", {
-    index: room.currentIndex + 1,
+    index: room.current + 1,
     total: room.questions.length,
     question: toPublicQuestion(question),
     scores: room.scores,
-  });
-}
-
-function handleBuzz(player) {
-  const room = getPlayerRoom(player);
-
-  if (!room) {
-    sendError(player.ws, "対戦ルームに参加していません。");
-    return;
-  }
-
-  if (room.finished) {
-    sendError(player.ws, "この対戦は終了しています。");
-    return;
-  }
-
-  if (room.currentIndex < 0 || room.currentIndex >= room.questions.length) {
-    sendError(player.ws, "現在回答できる問題がありません。");
-    return;
-  }
-
-  if (room.lockedBy) {
-    send(player.ws, "buzzRejected", {
-      message: "相手が先に早押ししました。",
-      lockedBy: room.lockedBy,
-    });
-    return;
-  }
-
-  room.lockedBy = player.id;
-
-  broadcast(room, "buzzed", {
-    playerId: player.id,
-    playerName: player.name,
-    message: `${player.name}さんが早押ししました。`,
+    timeLimit: 15
   });
 
-  send(player.ws, "canAnswer", {
-    message: "回答してください。",
-  });
+  room.timer = setTimeout(() => {
+    closeQuestion(room, "時間切れです。");
+  }, 15000);
 }
 
 function handleSubmitAnswer(player, data) {
   const room = getPlayerRoom(player);
 
-  if (!room) {
-    sendError(player.ws, "対戦ルームに参加していません。");
+  if (!room || room.finished) {
     return;
   }
 
-  if (room.lockedBy !== player.id) {
-    sendError(player.ws, "あなたは現在回答権を持っていません。");
-    return;
-  }
-
-  const question = room.questions[room.currentIndex];
+  const question = room.questions[room.current];
 
   if (!question) {
-    sendError(player.ws, "問題が見つかりません。");
     return;
   }
 
-  const userAnswer = String(data.answer || "").trim();
-
-  if (!userAnswer) {
-    sendError(player.ws, "回答を入力してください。");
+  if (room.answers[player.id]) {
     return;
   }
 
-  const isCorrect = judgeAnswer(userAnswer, question);
+  const chosen = Number(data.answer);
+  const correct = Number.isInteger(chosen) && chosen === question.correct;
 
-  if (isCorrect) {
+  room.answers[player.id] = {
+    chosen,
+    correct
+  };
+
+  if (correct) {
     room.scores[player.id] += 1;
+  }
 
-    const answerListId = room.answerListIds[player.id];
+  const allAnswered = room.players.every(p => room.answers[p.id]);
 
-    recordCorrectId({
-      answerListId,
-      questionNumber: room.currentIndex + 1,
-      questionId: question.questionId,
+  if (allAnswered) {
+    closeQuestion(room, "回答がそろいました。");
+  } else {
+    send(player.ws, "answerAccepted", {
+      message: "回答を送信しました。相手の回答を待っています。"
     });
   }
+}
 
-  broadcast(room, "answerResult", {
-    playerId: player.id,
-    playerName: player.name,
-    userAnswer,
-    isCorrect,
-    correctAnswer: getCorrectAnswerText(question),
-    explanation: "",
-    scores: room.scores,
+function closeQuestion(room, message) {
+  if (!room || room.finished) {
+    return;
+  }
+
+  clearQuestionTimer(room);
+
+  const question = room.questions[room.current];
+
+  room.players.forEach(player => {
+    if (!room.answers[player.id]) {
+      room.answers[player.id] = {
+        chosen: -1,
+        correct: false
+      };
+    }
   });
 
-  setTimeout(() => {
-    nextQuestion(room.id);
-  }, 2500);
+  broadcast(room, "answerResult", {
+    message,
+    index: room.current + 1,
+    total: room.questions.length,
+    correctIndex: question.correct,
+    correctAnswer: question.choices[question.correct],
+    explanation: question.explanation || "",
+    answers: room.answers,
+    scores: room.scores,
+    isLast: room.current + 1 >= room.questions.length
+  });
+}
+
+function handleReadyNext(player) {
+  const room = getPlayerRoom(player);
+
+  if (!room || room.finished) {
+    return;
+  }
+
+  room.readyNext.add(player.id);
+
+  const allReady = room.players.every(p => room.readyNext.has(p.id));
+
+  if (!allReady) {
+    send(player.ws, "waitingNext", {
+      message: "相手を待っています。"
+    });
+    return;
+  }
+
+  if (room.current + 1 >= room.questions.length) {
+    finishRoom(room);
+  } else {
+    nextQuestion(room);
+  }
 }
 
 function finishRoom(room) {
+  if (!room || room.finished) {
+    return;
+  }
+
+  clearQuestionTimer(room);
+
   room.finished = true;
 
-  const players = room.players;
-  const scoreA = room.scores[players[0].id];
-  const scoreB = room.scores[players[1].id];
+  const [playerA, playerB] = room.players;
+  const scoreA = room.scores[playerA.id] || 0;
+  const scoreB = room.scores[playerB.id] || 0;
 
-  let winner = null;
+  let message = "引き分けです。";
 
   if (scoreA > scoreB) {
-    winner = {
-      id: players[0].id,
-      name: players[0].name,
-    };
+    message = `${playerA.name}さんの勝利です。`;
   } else if (scoreB > scoreA) {
-    winner = {
-      id: players[1].id,
-      name: players[1].name,
-    };
+    message = `${playerB.name}さんの勝利です。`;
   }
 
   broadcast(room, "finished", {
-    scores: room.scores,
-    winner,
-    answerListIds: room.answerListIds,
-    message: winner ? `${winner.name}さんの勝ちです。` : "引き分けです。",
+    message,
+    scores: room.scores
   });
 
-  for (const player of room.players) {
-    player.roomId = null;
-  }
-
-  activeRooms.delete(room.id);
+  cleanupRoom(room);
 }
 
-function cleanupPlayer(player) {
-  removeWaitingPlayer(player.id);
+function handleLeave(player) {
+  const waitingKey = getMatchKey(player);
 
-  if (player.roomId) {
-    leaveRoom(player);
+  if (waitingPlayers.get(waitingKey)?.id === player.id) {
+    waitingPlayers.delete(waitingKey);
   }
-}
 
-function leaveRoom(player) {
-  const room = activeRooms.get(player.roomId);
+  const room = getPlayerRoom(player);
 
-  if (!room) {
-    player.roomId = null;
+  if (!room || room.finished) {
     return;
   }
 
-  const opponent = room.players.find(p => {
-    return p.id !== player.id;
+  broadcast(room, "opponentLeft", {
+    message: "相手が退出しました。"
   });
 
-  if (opponent && opponent.ws.readyState === WebSocket.OPEN) {
-    send(opponent.ws, "opponentLeft", {
-      message: `${player.name}さんが退出しました。`,
-    });
-
-    opponent.roomId = null;
-  }
-
-  activeRooms.delete(room.id);
-  player.roomId = null;
+  cleanupRoom(room);
 }
 
 function getPlayerRoom(player) {
-  if (!player.roomId) {
-    return null;
+  const roomId = playerRooms.get(player.id);
+  return roomId ? activeRooms.get(roomId) : null;
+}
+
+function clearQuestionTimer(room) {
+  if (room.timer) {
+    clearTimeout(room.timer);
+    room.timer = null;
   }
-
-  return activeRooms.get(player.roomId) || null;
 }
 
-function toPublicQuestion(question) {
-  return {
-    id: question.id,
-    questionId: question.questionId,
-    questionListId: question.questionListId,
-    type: "text",
-    text: question.text,
-    choices: [],
-    ownerId: question.ownerId,
-    ownerName: question.ownerName,
-  };
-}
+function cleanupRoom(room) {
+  clearQuestionTimer(room);
 
-function sanitizeName(name) {
-  const value = String(name || "").trim();
-
-  if (!value) {
-    return "ゲスト";
-  }
-
-  return value.slice(0, 20);
-}
-
-function send(ws, type, payload = {}) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    return;
-  }
-
-  ws.send(
-    JSON.stringify({
-      type,
-      ...payload,
-    })
-  );
-}
-
-function sendError(ws, message) {
-  send(ws, "error", {
-    message,
+  room.players.forEach(player => {
+    playerRooms.delete(player.id);
   });
-}
 
-function broadcast(room, type, payload = {}) {
-  for (const player of room.players) {
-    send(player.ws, type, payload);
-  }
+  activeRooms.delete(room.id);
 }
 
 module.exports = {
-  initBattleWebSocket,
+  initBattleWebSocket
 };
