@@ -12,6 +12,19 @@
       "passwordHash": "bd9037ef81a5ac1ab710fce6545711a8e8e1a7cb52d4dc25911b5049bd70cc91faae58aec2fbbf14a146813e8cf507148de8eb49d6837e282d771b89e561cf27",
       "createdAt": "2026-05-26T07:36:56.065Z",
       "updatedAt": "2026-05-27T01:03:41.035Z"
+    },
+    {
+      "userId": "user_6e4ef305e3",
+      "username": "ききききき",
+      "profile": "となりの客はよく柿食う客だ",
+      "userTagIds": [
+        "tag_bc973d16"
+      ],
+      "email": "iii@gmail.com",
+      "salt": "00a6e0fc347c8593247398c903883a25",
+      "passwordHash": "4450a513aa9a5c09760b38d1d7a729b274bff95010ebc7c8645f67bebf276afae12c45321fb0da635cf0198b61c35ecee957d4ce773b8bc4c3045f5d1cb6feec",
+      "createdAt": "2026-05-27T01:43:46.076Z",
+      "updatedAt": "2026-05-27T01:44:22.516Z"
     }
   ]
 }
