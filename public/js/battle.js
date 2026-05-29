@@ -21,6 +21,13 @@
    対戦モード開始画面
 ============================================================ */
 function renderBattleStart() {
+  const savedSubject = localStorage.getItem("revino_battle_subject") || "math";
+  const savedAge = localStorage.getItem("revino_battle_age") || "15";
+
+  const option = (value, label) => {
+    return `<option value="${value}" ${savedSubject === value ? "selected" : ""}>${label}</option>`;
+  };
+
   return `
     <div class="battle-start-screen">
       <div class="screen-header red-bg" style="position:absolute;top:0;left:0;right:0;padding:18px 20px 12px;backdrop-filter:none;background:transparent;z-index:2">
@@ -28,7 +35,9 @@ function renderBattleStart() {
         <div class="header-title">対戦モード</div>
         <div style="width:40px"></div>
       </div>
+
       <div style="height:42px"></div>
+
       <div class="battle-start-emblem">
         <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14 50l24-24"/><path d="M10 50h8v-8"/>
@@ -38,35 +47,96 @@ function renderBattleStart() {
           <circle cx="32" cy="32" r="3" fill="currentColor"/>
         </svg>
       </div>
+
       <div class="battle-start-title">対戦モード</div>
-      <div class="battle-start-desc">5問4択で他のユーザーと対戦！<br>正解数を競い、ポイントを獲得しよう。</div>
+      <div class="battle-start-desc">
+        5問4択で他のユーザーと対戦！<br>
+        正解数を競い、ポイントを獲得しよう。
+      </div>
+
       <div class="battle-start-info">
         <div class="battle-start-info-row">
           <div class="info-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="4" y1="10" x2="20" y2="10"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="5" width="16" height="16" rx="2"/>
+              <line x1="8" y1="3" x2="8" y2="7"/>
+              <line x1="16" y1="3" x2="16" y2="7"/>
+              <line x1="4" y1="10" x2="20" y2="10"/>
+            </svg>
           </div>
           <span>出題数：5問</span>
         </div>
+
         <div class="battle-start-info-row">
           <div class="info-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"/>
+              <polyline points="12 7 12 12 15 14"/>
+            </svg>
           </div>
           <span>制限時間：15秒／問</span>
         </div>
+
         <div class="battle-start-info-row">
           <div class="info-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4a2 2 0 0 1-2-2V5h4"/><path d="M18 9h2a2 2 0 0 0 2-2V5h-4"/><path d="M6 5h12v6a6 6 0 0 1-12 0V5z"/><path d="M9 21h6"/><path d="M12 17v4"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 9H4a2 2 0 0 1-2-2V5h4"/>
+              <path d="M18 9h2a2 2 0 0 0 2-2V5h-4"/>
+              <path d="M6 5h12v6a6 6 0 0 1-12 0V5z"/>
+              <path d="M9 21h6"/>
+              <path d="M12 17v4"/>
+            </svg>
           </div>
-          <span>勝利：+30pt　引き分け：+10pt</span>
+          <span>勝利：+${BATTLE_POINT_WIN}pt　引き分け：+${BATTLE_POINT_DRAW}pt</span>
+        </div>
+
+        <div class="battle-start-info-row">
+          <div class="info-icon">
+            ${svg(IC.bookOpen, 18)}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:900;margin-bottom:6px">教科</div>
+            <select id="battle-subject" class="form-input" onchange="saveBattleSettings()">
+              ${option("japanese", "国語")}
+              ${option("math", "数学")}
+              ${option("english", "英語")}
+              ${option("science", "理科")}
+              ${option("social", "社会")}
+            </select>
+          </div>
+        </div>
+
+        <div class="battle-start-info-row">
+          <div class="info-icon">
+            ${svg(IC.user, 18)}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:900;margin-bottom:6px">年齢</div>
+            <input
+              id="battle-age"
+              class="form-input"
+              type="number"
+              min="1"
+              max="120"
+              value="${esc(savedAge)}"
+              onchange="saveBattleSettings()"
+            >
+          </div>
         </div>
       </div>
+
       <button class="btn btn-primary" style="width:100%;font-size:17px;padding:18px" onclick="navigate('battle-matching')">
         マッチ開始
         <span class="arrow-fab">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 6 15 12 9 18"/>
+          </svg>
         </span>
       </button>
-      <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="navigate('home')">キャンセル</button>
+
+      <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="navigate('home')">
+        キャンセル
+      </button>
     </div>`;
 }
 
@@ -78,42 +148,172 @@ function renderBattleStart() {
 function renderBattleMatching() {
   return `
     <div class="screen-header">
-      <button class="back-btn" onclick="navigate('battle-start')"></button>
+      <button class="back-btn" onclick="cancelBattleMatching()"></button>
       <div class="header-title">対戦マッチング</div>
       <div style="width:40px"></div>
     </div>
+
     <div class="matching-screen">
       <div class="matching-vs-row">
         <div class="matching-player-card">
           ${getAvatarHTML(S.user.avatar, 56)}
-          <div class="matching-player-name">${esc(S.user.name)}</div>
+          <div class="matching-player-name">${esc(S.user.name || S.user.username || "YOU")}</div>
         </div>
+
         <div class="matching-vs-badge">VS</div>
+
         <div class="matching-player-card">
           <div class="matching-opp-placeholder">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
           </div>
           <div class="matching-player-name" style="color:var(--text-3)">???</div>
         </div>
       </div>
-      <div class="matching-status-text">対戦相手を探しています<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></div>
-      <button class="btn btn-ghost btn-sm" onclick="navigate('battle-start')" style="margin-top:4px">キャンセル</button>
+
+      <div class="matching-status-text">
+        対戦相手を探しています<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
+      </div>
+
+      <div id="battle-matching-status" class="battle-status-message">
+        サーバーに接続しています。
+      </div>
+
+      <button class="btn btn-ghost btn-sm" onclick="cancelBattleMatching()" style="margin-top:4px">
+        キャンセル
+      </button>
     </div>`;
 }
 
 /* TODO(DB担当): ローカルの BATTLE_OPPONENTS の代わりにサーバーのマッチング API を呼ぶ */
-function runMatchmaking() {
-  setTimeout(()=>{
-    const opp       = BATTLE_OPPONENTS[Math.floor(Math.random()*BATTLE_OPPONENTS.length)];
-    const battleQs  = shuffle(S.questions).slice(0,5);
-    if (battleQs.length<5) { alert('問題が少なすぎます。資料をアップロードして問題を追加してください。'); navigate('battle-start'); return; }
-    const oppAnswers = battleQs.map(q=>({ chosen: Math.random()<opp.accuracy ? q.correct : (q.correct+1+Math.floor(Math.random()*3))%4, correct:false }));
-    oppAnswers.forEach((a,i)=>{ a.correct = a.chosen===battleQs[i].correct; });
-    S.battleSession = { opponent:opp, questions:battleQs, current:0, playerAnswers:[], oppAnswers, playerScore:0, oppScore:oppAnswers.filter(a=>a.correct).length };
-    navigate('battle', {});
-  }, 3500);
+async function runMatchmaking() {
+  try {
+    saveBattleSettings();
+
+    const subject = getBattleSubject();
+    const age = getBattleAge();
+
+    updateBattleMatchingStatus(`${BATTLE_SUBJECT_LABELS[subject]} / ${age}歳で接続中です。`);
+
+    await getBattleSocket();
+
+    updateBattleMatchingStatus(`${BATTLE_SUBJECT_LABELS[subject]} / ${age}歳で相手を探しています。`);
+
+    sendBattleMessage({
+      type: "join",
+      name: S.user.name || S.user.username || "ゲスト",
+      age,
+      subject,
+      avatar: S.user.avatar || "🐧"
+    });
+  } catch {
+    alert("対戦サーバーに接続できませんでした。");
+    navigate("battle-start");
+  }
 }
 
+
+let battleWs = null;
+let battlePlayerId = null;
+let battleRoomId = null;
+let battleWaitingResult = false;
+
+const BATTLE_POINT_WIN = 30;
+const BATTLE_POINT_DRAW = 10;
+
+const BATTLE_SUBJECT_LABELS = {
+  japanese: "国語",
+  math: "数学",
+  english: "英語",
+  science: "理科",
+  social: "社会"
+};
+
+function getBattleSubject() {
+  const el = document.getElementById("battle-subject");
+  return el ? el.value : localStorage.getItem("revino_battle_subject") || "math";
+}
+
+function getBattleAge() {
+  const el = document.getElementById("battle-age");
+  const value = el ? Number(el.value) : Number(localStorage.getItem("revino_battle_age") || 15);
+
+  if (!Number.isInteger(value) || value < 1 || value > 120) {
+    return 15;
+  }
+
+  return value;
+}
+
+function saveBattleSettings() {
+  localStorage.setItem("revino_battle_subject", getBattleSubject());
+  localStorage.setItem("revino_battle_age", String(getBattleAge()));
+}
+
+function closeBattleSocket() {
+  if (battleWs && battleWs.readyState === WebSocket.OPEN) {
+    battleWs.send(JSON.stringify({ type: "leave" }));
+    battleWs.close();
+  }
+
+  battleWs = null;
+  battlePlayerId = null;
+  battleRoomId = null;
+  battleWaitingResult = false;
+}
+
+function getBattleSocket() {
+  return new Promise((resolve, reject) => {
+    if (battleWs && battleWs.readyState === WebSocket.OPEN) {
+      resolve(battleWs);
+      return;
+    }
+
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    battleWs = new WebSocket(`${protocol}//${location.host}/ws/battle`);
+
+    battleWs.addEventListener("open", () => {
+      resolve(battleWs);
+    });
+
+    battleWs.addEventListener("message", event => {
+      const data = JSON.parse(event.data);
+      handleBattleServerMessage(data);
+    });
+
+    battleWs.addEventListener("close", () => {
+      battleWs = null;
+    });
+
+    battleWs.addEventListener("error", () => {
+      reject(new Error("WebSocket接続に失敗しました"));
+    });
+  });
+}
+
+function sendBattleMessage(data) {
+  if (!battleWs || battleWs.readyState !== WebSocket.OPEN) {
+    return false;
+  }
+
+  battleWs.send(JSON.stringify(data));
+  return true;
+}
+
+function updateBattleMatchingStatus(message) {
+  const el = document.getElementById("battle-matching-status");
+
+  if (el) {
+    el.textContent = message;
+  }
+}
+
+function cancelBattleMatching() {
+  closeBattleSocket();
+  navigate("battle-start");
+}
 
 /* ============================================================
    対戦中画面
@@ -204,92 +404,155 @@ function renderBattle() {
 /* Q1 の VS イントロが終わってからタイマーを開始する（1問あたり15秒） */
 function startBattleTimer() {
   clearInterval(battleTimerInterval);
-  const intro      = document.getElementById('battle-vs-intro');
+
+  const sess = S.battleSession;
+
+  if (!sess) {
+    return;
+  }
+
+  const intro = document.getElementById("battle-vs-intro");
   const startDelay = intro ? 1550 : 0;
-  if (intro) setTimeout(() => { const el = document.getElementById('battle-vs-intro'); if (el) el.remove(); }, 1550);
+
+  if (intro) {
+    setTimeout(() => {
+      const el = document.getElementById("battle-vs-intro");
+      if (el) {
+        el.remove();
+      }
+    }, 1550);
+  }
 
   setTimeout(() => {
-    let t = 15;
+    let t = sess.timeLimit || 15;
+
+    const timerEl = document.getElementById("battle-timer");
+
+    if (timerEl) {
+      timerEl.textContent = t;
+    }
+
     battleTimerInterval = setInterval(() => {
       t--;
-      const el = document.getElementById('battle-timer'); if (!el) { clearInterval(battleTimerInterval); return; }
+
+      const el = document.getElementById("battle-timer");
+
+      if (!el) {
+        clearInterval(battleTimerInterval);
+        return;
+      }
+
       el.textContent = t;
-      if (t <= 5) el.classList.add('timer-urgent');
-      if (t <= 0) { clearInterval(battleTimerInterval); answerBattle(-1); }
+
+      if (t <= 5) {
+        el.classList.add("timer-urgent");
+      }
+
+      if (t <= 0) {
+        clearInterval(battleTimerInterval);
+
+        if (!battleWaitingResult) {
+          answerBattle(-1);
+        }
+      }
     }, 1000);
   }, startDelay);
 }
 
 function answerBattle(chosen) {
+  if (battleWaitingResult) {
+    return;
+  }
+
+  battleWaitingResult = true;
   clearInterval(battleTimerInterval);
-  const sess = S.battleSession;
-  const q    = sess.questions[sess.current];
-  const ok   = chosen !== -1 && chosen === q.correct;
-  sess.playerAnswers.push({ chosen, correct: ok });
-  if (ok) sess.playerScore++;
-  document.getElementById('player-score').textContent = sess.playerScore;
 
-  const oppAns = sess.oppAnswers[sess.current];
-  const labels = ['A','B','C','D'];
-
-  document.querySelectorAll('.bchoice-btn').forEach((btn, ci) => {
-    btn.classList.add('disabled');
-    if (ci === q.correct)          btn.classList.add('correct');
-    else if (ci === chosen && !ok) btn.classList.add('wrong');
+  document.querySelectorAll(".bchoice-btn").forEach(btn => {
+    btn.classList.add("disabled");
+    btn.disabled = true;
   });
 
-  const pDot = document.getElementById(`dot-p-${sess.current}`);
-  if (pDot) { pDot.className = `pdot pdot-${ok?'correct':'wrong'} pdot-pop`; }
-  const oDot = document.getElementById(`dot-o-${sess.current}`);
-  if (oDot) { oDot.className = `pdot pdot-${oppAns.correct?'correct':'wrong'} pdot-pop`; }
+  const ok = sendBattleMessage({
+    type: "submitAnswer",
+    answer: chosen
+  });
 
-  const oStatus = document.getElementById('opp-status');
-  if (oStatus) oStatus.innerHTML = oppAns.correct
-    ? `<span style="color:var(--green);font-weight:700">✓ 正解しました</span>`
-    : `<span style="color:var(--red);font-weight:700">✗ 不正解でした</span>`;
+  if (!ok) {
+    alert("サーバーとの接続が切れています。");
+    navigate("battle-start");
+    return;
+  }
 
-  const fb  = document.getElementById('battle-feedback');
-  const fbr = document.getElementById('battle-feedback-result');
-  const fbe = document.getElementById('battle-feedback-explain');
-  fbr.textContent = ok ? '✓ 正解！' : `✗ 不正解（正解：${labels[q.correct]}）`;
-  fbr.className   = `bif-result ${ok ? 'correct' : 'wrong'}`;
-  fbe.textContent = (oppAns.correct ? `${sess.opponent.name} も正解 ✓` : `${sess.opponent.name} は不正解 ✗`)
-    + (q.explanation ? `\n解説: ${q.explanation}` : '');
-  const isLast = sess.current + 1 >= sess.questions.length;
-  document.getElementById('battle-next-btn').textContent = isLast ? '結果を見る ›' : '次の問題へ →';
-  fb.classList.add('show');
+  const oStatus = document.getElementById("opp-status");
+
+  if (oStatus) {
+    oStatus.innerHTML = `
+      <span class="opp-thinking-text">相手の回答を待っています</span>
+      <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
+    `;
+  }
 }
 
 function nextBattleQ() {
-  S.battleSession.current++;
-  if (S.battleSession.current >= S.battleSession.questions.length) finishBattle();
-  else navigate('battle',{});
+  const btn = document.getElementById("battle-next-btn");
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "相手を待っています...";
+  }
+
+  sendBattleMessage({
+    type: "readyNext"
+  });
 }
 
 /* TODO(DB担当): 結果をサーバーに保存し、ランキングを更新する */
 function finishBattle() {
   clearInterval(battleTimerInterval);
-  const sess = S.battleSession;
-  if (sess.playerScore>sess.oppScore) { S.user.wins++; S.user.points+=150; }
-  else if (sess.playerScore===sess.oppScore) { S.user.points+=50; }
-  save();
-  navigate('battle-result',{});
+  navigate("battle-result", {});
 }
 
 /* 獲得ポイントを 0 からカウントアップする */
 function startPointCountUp() {
-  const sess = S.battleSession; if (!sess) return;
-  const outcome = sess.playerScore > sess.oppScore ? 'win' : sess.playerScore === sess.oppScore ? 'draw' : 'lose';
-  const target  = outcome === 'win' ? 150 : outcome === 'draw' ? 50 : 0;
-  if (target === 0) return;
-  const el = document.getElementById('battle-result-pts');
-  if (!el) return;
-  el.textContent = '+0pt';
+  const sess = S.battleSession;
+
+  if (!sess) {
+    return;
+  }
+
+  const outcome = sess.playerScore > sess.oppScore
+    ? "win"
+    : sess.playerScore === sess.oppScore
+      ? "draw"
+      : "lose";
+
+  const target = outcome === "win"
+    ? BATTLE_POINT_WIN
+    : outcome === "draw"
+      ? BATTLE_POINT_DRAW
+      : 0;
+
+  if (target === 0) {
+    return;
+  }
+
+  const el = document.getElementById("battle-result-pts");
+
+  if (!el) {
+    return;
+  }
+
+  el.textContent = "+0pt";
+
   let n = 0;
+
   const iv = setInterval(() => {
-    n = Math.min(n + Math.ceil(target / 25), target);
+    n = Math.min(n + Math.ceil(target / 20), target);
     el.textContent = `+${n}pt`;
-    if (n >= target) clearInterval(iv);
+
+    if (n >= target) {
+      clearInterval(iv);
+    }
   }, 28);
 }
 
@@ -303,7 +566,11 @@ function renderBattleResult() {
   const labels     = ['A','B','C','D'];
   const outcome    = playerScore>oppScore ? 'win' : playerScore===oppScore ? 'draw' : 'lose';
   const outcomeText = outcome==='win' ? 'WIN' : outcome==='draw' ? 'DRAW' : 'LOSE';
-  const ptGain     = outcome==='win' ? 150 : outcome==='draw' ? 50 : 0;
+  const ptGain = outcome === "win"
+  ? BATTLE_POINT_WIN
+  : outcome === "draw"
+    ? BATTLE_POINT_DRAW
+    : 0;
   const wrongByOpp = questions.filter((q,i)=>!oppAnswers[i].correct && playerAnswers[i]?.correct);
 
   const rows = questions.map((q,i)=>{
@@ -406,4 +673,276 @@ function renderBattleHistory() {
       </div>
       <div class="bh-list">${rows}</div>
     </div>`;
+}
+
+function handleBattleServerMessage(data) {
+  switch (data.type) {
+    case "connected":
+      battlePlayerId = data.playerId;
+      break;
+
+    case "joined":
+      updateBattleMatchingStatus(
+        `${data.subjectLabel || ""} / ${data.age || ""}歳で相手を探しています。`
+      );
+      break;
+
+    case "waiting":
+      updateBattleMatchingStatus(data.message || "対戦相手を探しています。");
+      break;
+
+    case "matched":
+      handleBattleMatched(data);
+      break;
+
+    case "question":
+      handleBattleQuestion(data);
+      break;
+
+    case "answerAccepted":
+      updateOpponentStatus("相手の回答を待っています");
+      break;
+
+    case "waitingNext":
+      updateOpponentStatus(data.message || "相手を待っています");
+      break;
+
+    case "answerResult":
+      handleBattleAnswerResult(data);
+      break;
+
+    case "finished":
+      handleBattleFinished(data);
+      break;
+
+    case "opponentLeft":
+      alert(data.message || "相手が退出しました。");
+      closeBattleSocket();
+      navigate("battle-start");
+      break;
+
+    case "error":
+      alert(data.message || "対戦エラーが発生しました。");
+      navigate("battle-start");
+      break;
+
+    default:
+      break;
+  }
+}
+
+function updateOpponentStatus(message) {
+  const el = document.getElementById("opp-status");
+
+  if (!el) {
+    return;
+  }
+
+  el.innerHTML = `
+    <span class="opp-thinking-text">${esc(message)}</span>
+    <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
+  `;
+}
+
+function handleBattleMatched(data) {
+  battleRoomId = data.roomId;
+
+  const opponent = data.players.find(player => player.id !== battlePlayerId);
+
+  S.battleSession = {
+    roomId: data.roomId,
+    subject: data.subject,
+    subjectLabel: data.subjectLabel,
+    age: data.age,
+    opponent: {
+      id: opponent?.id,
+      name: opponent?.name || "RIVAL",
+      avatar: opponent?.avatar || "🤖"
+    },
+    questions: [],
+    current: 0,
+    playerAnswers: [],
+    oppAnswers: [],
+    playerScore: 0,
+    oppScore: 0,
+    timeLimit: 15,
+    pointsApplied: false
+  };
+
+  updateBattleMatchingStatus("相手が見つかりました。問題を準備しています。");
+}
+
+function handleBattleQuestion(data) {
+  battleWaitingResult = false;
+
+  if (!S.battleSession) {
+    return;
+  }
+
+  const questionIndex = data.index - 1;
+  const scores = data.scores || {};
+  const opponentId = S.battleSession.opponent.id;
+
+  S.battleSession.current = questionIndex;
+  S.battleSession.timeLimit = data.timeLimit || 15;
+
+  S.battleSession.questions[questionIndex] = {
+    id: data.question.id,
+    text: data.question.text,
+    choices: data.question.choices,
+    correct: null,
+    explanation: ""
+  };
+
+  S.battleSession.playerScore = scores[battlePlayerId] || 0;
+  S.battleSession.oppScore = scores[opponentId] || 0;
+
+  navigate("battle", {});
+}
+
+function handleBattleAnswerResult(data) {
+  battleWaitingResult = false;
+  clearInterval(battleTimerInterval);
+
+  const sess = S.battleSession;
+
+  if (!sess) {
+    return;
+  }
+
+  const index = data.index - 1;
+  const question = sess.questions[index];
+
+  if (!question) {
+    return;
+  }
+
+  const opponentId = sess.opponent.id;
+
+  const myAnswer = data.answers[battlePlayerId] || {
+    chosen: -1,
+    correct: false
+  };
+
+  const oppAnswer = data.answers[opponentId] || {
+    chosen: -1,
+    correct: false
+  };
+
+  question.correct = data.correctIndex;
+  question.explanation = data.explanation || "";
+
+  sess.playerAnswers[index] = myAnswer;
+  sess.oppAnswers[index] = oppAnswer;
+
+  sess.playerScore = data.scores[battlePlayerId] || 0;
+  sess.oppScore = data.scores[opponentId] || 0;
+
+  showBattleFeedbackFromServer(data, myAnswer, oppAnswer);
+}
+
+function showBattleFeedbackFromServer(data, myAnswer, oppAnswer) {
+  const sess = S.battleSession;
+  const labels = ["A", "B", "C", "D"];
+
+  const playerScoreEl = document.getElementById("player-score");
+  const oppScoreEl = document.getElementById("opp-score");
+
+  if (playerScoreEl) {
+    playerScoreEl.textContent = sess.playerScore;
+  }
+
+  if (oppScoreEl) {
+    oppScoreEl.textContent = sess.oppScore;
+  }
+
+  document.querySelectorAll(".bchoice-btn").forEach((btn, ci) => {
+    btn.classList.add("disabled");
+    btn.disabled = true;
+
+    if (ci === data.correctIndex) {
+      btn.classList.add("correct");
+    } else if (ci === myAnswer.chosen && !myAnswer.correct) {
+      btn.classList.add("wrong");
+    }
+  });
+
+  const pDot = document.getElementById(`dot-p-${sess.current}`);
+
+  if (pDot) {
+    pDot.className = `pdot pdot-${myAnswer.correct ? "correct" : "wrong"} pdot-pop`;
+  }
+
+  const oDot = document.getElementById(`dot-o-${sess.current}`);
+
+  if (oDot) {
+    oDot.className = `pdot pdot-${oppAnswer.correct ? "correct" : "wrong"} pdot-pop`;
+  }
+
+  const oStatus = document.getElementById("opp-status");
+
+  if (oStatus) {
+    oStatus.innerHTML = oppAnswer.correct
+      ? `<span style="color:var(--green);font-weight:700">✓ 正解しました</span>`
+      : `<span style="color:var(--red);font-weight:700">✗ 不正解でした</span>`;
+  }
+
+  const fb = document.getElementById("battle-feedback");
+  const fbr = document.getElementById("battle-feedback-result");
+  const fbe = document.getElementById("battle-feedback-explain");
+  const nextBtn = document.getElementById("battle-next-btn");
+
+  if (!fb || !fbr || !fbe || !nextBtn) {
+    return;
+  }
+
+  fbr.textContent = myAnswer.correct
+    ? "✓ 正解！"
+    : `✗ 不正解（正解：${labels[data.correctIndex]}）`;
+
+  fbr.className = `bif-result ${myAnswer.correct ? "correct" : "wrong"}`;
+
+  fbe.textContent = (oppAnswer.correct
+    ? `${sess.opponent.name} も正解 ✓`
+    : `${sess.opponent.name} は不正解 ✗`)
+    + (data.explanation ? `\n解説: ${data.explanation}` : "");
+
+  nextBtn.textContent = data.isLast ? "結果を見る ›" : "次の問題へ →";
+  nextBtn.disabled = false;
+
+  fb.classList.add("show");
+}
+
+function handleBattleFinished(data) {
+  const sess = S.battleSession;
+
+  if (!sess) {
+    return;
+  }
+
+  const scores = data.scores || {};
+  const opponentId = sess.opponent.id;
+
+  sess.playerScore = scores[battlePlayerId] || 0;
+  sess.oppScore = scores[opponentId] || 0;
+
+  const outcome = sess.playerScore > sess.oppScore
+    ? "win"
+    : sess.playerScore === sess.oppScore
+      ? "draw"
+      : "lose";
+
+  if (!sess.pointsApplied) {
+    if (outcome === "win") {
+      S.user.wins = Number(S.user.wins || 0) + 1;
+      S.user.points = Number(S.user.points || 0) + BATTLE_POINT_WIN;
+    } else if (outcome === "draw") {
+      S.user.points = Number(S.user.points || 0) + BATTLE_POINT_DRAW;
+    }
+
+    sess.pointsApplied = true;
+    save();
+  }
+
+  navigate("battle-result", {});
 }
