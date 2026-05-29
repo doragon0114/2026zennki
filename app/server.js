@@ -8,6 +8,7 @@ require("dotenv").config();
 const authRoutes = require("./features/auth/authRoutes");
 const pageRoutes = require("./routes/pageRoutes");
 const ollamaRoutes = require("./ollama/ollamaRoutes");
+const studyRoutes = require("./features/study/studyRoutes");
 
 const { initBattleWebSocket } = require("./features/battle/battleSocket");
 
@@ -43,6 +44,7 @@ app.use(
 // 認証API
 // 今の auth.js は localStorage 認証ですが、後でAPI認証へ戻す場合に使えます。
 app.use("/api/auth", authRoutes);
+app.use("/api/study", studyRoutes);
 
 // Ollama確認用API
 if (process.env.ENABLE_OLLAMA_TOOLS !== "false") {

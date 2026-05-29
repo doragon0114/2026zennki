@@ -1,0 +1,124 @@
+{
+  "materials": [
+    {
+      "id": "mat_basic_5subjects",
+      "name": "五教科 基礎問題集",
+      "type": "mock",
+      "filename": "mock-basic-5subjects",
+      "createdAt": "2026-05-01T00:00:00.000Z",
+      "questionCount": 10,
+      "shared": true
+    },
+    {
+      "id": "mat_math_basic",
+      "name": "数学 基礎演習",
+      "type": "mock",
+      "filename": "mock-math-basic",
+      "createdAt": "2026-05-01T00:00:00.000Z",
+      "questionCount": 5,
+      "shared": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "q_jp_001",
+      "materialId": "mat_basic_5subjects",
+      "category": "国語",
+      "tags": ["漢字", "基礎"],
+      "text": "「山」の音読みはどれですか？",
+      "choices": ["やま", "サン", "かわ", "リン"],
+      "correct": 1,
+      "explanation": "「山」の音読みは「サン」です。"
+    },
+    {
+      "id": "q_jp_002",
+      "materialId": "mat_basic_5subjects",
+      "category": "国語",
+      "tags": ["品詞", "基礎"],
+      "text": "「走る」の品詞はどれですか？",
+      "choices": ["名詞", "動詞", "形容詞", "副詞"],
+      "correct": 1,
+      "explanation": "「走る」は動作を表すので動詞です。"
+    },
+    {
+      "id": "q_math_001",
+      "materialId": "mat_math_basic",
+      "category": "数学",
+      "tags": ["計算", "九九"],
+      "text": "7 × 8 はいくつですか？",
+      "choices": ["54", "56", "58", "64"],
+      "correct": 1,
+      "explanation": "7 × 8 = 56 です。"
+    },
+    {
+      "id": "q_math_002",
+      "materialId": "mat_math_basic",
+      "category": "数学",
+      "tags": ["図形", "基礎"],
+      "text": "三角形の内角の和は何度ですか？",
+      "choices": ["90度", "120度", "180度", "360度"],
+      "correct": 2,
+      "explanation": "三角形の内角の和は180度です。"
+    },
+    {
+      "id": "q_en_001",
+      "materialId": "mat_basic_5subjects",
+      "category": "英語",
+      "tags": ["単語", "基礎"],
+      "text": "「りんご」を英語で表すとどれですか？",
+      "choices": ["apple", "orange", "banana", "grape"],
+      "correct": 0,
+      "explanation": "「りんご」は英語で apple です。"
+    },
+    {
+      "id": "q_en_002",
+      "materialId": "mat_basic_5subjects",
+      "category": "英語",
+      "tags": ["単語", "動詞"],
+      "text": "「走る」を英語で表すとどれですか？",
+      "choices": ["walk", "run", "read", "sleep"],
+      "correct": 1,
+      "explanation": "「走る」は英語で run です。"
+    },
+    {
+      "id": "q_sci_001",
+      "materialId": "mat_basic_5subjects",
+      "category": "理科",
+      "tags": ["物質", "状態変化"],
+      "text": "水が氷になることを何といいますか？",
+      "choices": ["蒸発", "凝固", "融解", "沸騰"],
+      "correct": 1,
+      "explanation": "液体が固体になることを凝固といいます。"
+    },
+    {
+      "id": "q_sci_002",
+      "materialId": "mat_basic_5subjects",
+      "category": "理科",
+      "tags": ["植物", "光合成"],
+      "text": "植物が光を使って養分を作るはたらきはどれですか？",
+      "choices": ["呼吸", "光合成", "蒸発", "分解"],
+      "correct": 1,
+      "explanation": "植物が光を使って養分を作るはたらきは光合成です。"
+    },
+    {
+      "id": "q_soc_001",
+      "materialId": "mat_basic_5subjects",
+      "category": "社会",
+      "tags": ["地理", "日本"],
+      "text": "日本の首都はどこですか？",
+      "choices": ["大阪", "京都", "東京", "札幌"],
+      "correct": 2,
+      "explanation": "日本の首都は東京です。"
+    },
+    {
+      "id": "q_soc_002",
+      "materialId": "mat_basic_5subjects",
+      "category": "社会",
+      "tags": ["地理", "日本"],
+      "text": "日本で一番高い山はどれですか？",
+      "choices": ["富士山", "阿蘇山", "筑波山", "高尾山"],
+      "correct": 0,
+      "explanation": "日本で一番高い山は富士山です。"
+    }
+  ]
+}

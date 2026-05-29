@@ -313,6 +313,12 @@ function afterRender(screen, params) {
     runAIAnalysis(params);
   }
 
+  if (screen === 'question-set' && typeof loadStudyDataFromServer === 'function') {
+    if (!studyLoaded && (!Array.isArray(S.questions) || S.questions.length === 0)) {
+      loadStudyDataFromServer();
+    }
+  }
+
   if (screen === 'battle-matching') {
     runMatchmaking();
   }
