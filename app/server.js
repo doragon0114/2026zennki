@@ -10,6 +10,7 @@ const pageRoutes = require("./routes/pageRoutes");
 const ollamaRoutes = require("./ollama/ollamaRoutes");
 const studyRoutes = require("./features/study/studyRoutes");
 const aiRoutes = require("./features/AI/aiRoutes");  // 追加
+const materialsRoutes = require("./features/materials/materialsRoutes");
 
 const { initBattleWebSocket } = require("./features/battle/battleSocket");
 
@@ -22,6 +23,7 @@ const publicPath = path.join(__dirname, "public");
 // ===== 共通ミドルウェア =====
 app.use(express.json({ limit: "10mb" }));  // 変更: 画像base64転送に対応
 app.use(express.urlencoded({ extended: true }));
+app.use("/api/materials", materialsRoutes);
 
 // ===== セッション設定 =====
 app.use(
