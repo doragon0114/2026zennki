@@ -8,6 +8,7 @@ require("dotenv").config();
 const authRoutes = require("./features/auth/authRoutes");
 const pageRoutes = require("./routes/pageRoutes");
 const ollamaRoutes = require("./ollama/ollamaRoutes");
+const aiRoutes = require("./features/AI/aiRoutes");  // 追加
 
 const { initBattleWebSocket } = require("./features/battle/battleSocket");
 
@@ -18,12 +19,10 @@ const PORT = process.env.PORT || 3000;
 const publicPath = path.join(__dirname, "public");
 
 // ===== 共通ミドルウェア =====
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));  // 変更: 画像base64転送に対応
 app.use(express.urlencoded({ extended: true }));
 
 // ===== セッション設定 =====
-// 現在の auth.js が localStorage 認証なら、画面遷移には requireLogin を使わない。
-// ただし、後でサーバー認証へ戻せるように session は残しておく。
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "change-this-secret-key",
@@ -41,13 +40,15 @@ app.use(
 // ==================================================
 
 // 認証API
-// 今の auth.js は localStorage 認証ですが、後でAPI認証へ戻す場合に使えます。
 app.use("/api/auth", authRoutes);
 
 // Ollama確認用API
 if (process.env.ENABLE_OLLAMA_TOOLS !== "false") {
   app.use("/api/ollama", ollamaRoutes);
 }
+
+// AI解析API（OCR・問題生成）  // 追加
+app.use("/api/AI", aiRoutes);
 
 // サーバー確認
 app.get("/api/health", (req, res) => {
@@ -66,17 +67,11 @@ app.get("/api/health", (req, res) => {
 // ==================================================
 // 画面ルーター
 // ==================================================
-// /home, /battle, /mypage などは全部 index.html を返す。
-// index.html 内で shared.js の navigate() が画面を切り替える。
 app.use("/", pageRoutes);
 
 // ==================================================
 // 静的ファイル
 // ==================================================
-// /css/style.css
-// /js/shared.js
-// /js/home.js
-// などを配信する。
 app.use(express.static(publicPath));
 
 // ==================================================
@@ -93,8 +88,6 @@ app.use((req, res) => {
 // ==================================================
 // WebSocket対戦機能
 // ==================================================
-// battle.js が /ws/battle に接続するため、app.listen ではなく
-// http.createServer(app) に WebSocket を乗せる。
 initBattleWebSocket(server);
 
 // ==================================================
