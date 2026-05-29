@@ -8,6 +8,7 @@ require("dotenv").config();
 const authRoutes = require("./features/auth/authRoutes");
 const pageRoutes = require("./routes/pageRoutes");
 const ollamaRoutes = require("./ollama/ollamaRoutes");
+const studyRoutes = require("./features/study/studyRoutes");
 const aiRoutes = require("./features/AI/aiRoutes");  // 追加
 
 const { initBattleWebSocket } = require("./features/battle/battleSocket");
@@ -41,6 +42,7 @@ app.use(
 
 // 認証API
 app.use("/api/auth", authRoutes);
+app.use("/api/study", studyRoutes);
 
 // Ollama確認用API
 if (process.env.ENABLE_OLLAMA_TOOLS !== "false") {

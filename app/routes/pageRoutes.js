@@ -72,6 +72,8 @@ router.get("/question-set", sendIndex);
 router.get("/question-edit", sendIndex);
 router.get("/study", sendIndex);
 router.get("/study-result", sendIndex);
+router.get("/question", sendIndex);
+router.get("/result", sendIndex);
 
 // 対戦系
 router.get("/battle", sendIndex);
