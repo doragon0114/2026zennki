@@ -117,6 +117,7 @@ let S = {
   studySession: null,  // 個人学習中のセッション情報
   battleSession: null, // 対戦中のセッション情報
   studyFilter: 'すべて', // 問題集選択画面のカテゴリフィルター
+  
 };
 
 
@@ -236,6 +237,7 @@ let uploadMethod       = 'camera';
 let editingQid         = null;
 let battleTimerInterval = null;
 let selectedAvatar     = null;
+let selectedFile       = null;  
 
 
 /* ============================================================

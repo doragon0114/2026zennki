@@ -1,28 +1,7 @@
 /* ============================================================
    upload.js — 資料アップロード・AI解析画面
-   ─────────────────────────────────────────────────────────────
-   担当: AI機能担当 ★ このファイルが主な作業対象です
-
-   TODO（AI担当者へ）:
-     ・runAIAnalysis(params) の中身を本物の AI API 呼び出しに置き換える
-       現在はモックデータ（AI_GENERATED_TEMPLATES）から問題を生成しているが、
-       実際には資料テキストを API に送り、返ってきた問題データを使う
-
-     ・finishAnalysis(params) でサーバーへの問題保存処理を追加する
-       現在は S.questions に直接 push しているが、
-       本番では DB 保存 API を呼んでから navigate する
-
-   関連データ（shared.js に定義）:
-     ・AI_GENERATED_TEMPLATES  … 現在使っているモック問題テンプレート
-     ・S.materials / S.questions … 教材・問題を格納する状態オブジェクト
-     ・save()                  … localStorage に保存する関数
 ============================================================ */
 
-
-/* ============================================================
-   資料アップロード画面
-   カメラ撮影またはファイル選択で教材を取り込む
-============================================================ */
 function renderUpload() {
   return `
     <div class="screen-header blue-bg">
@@ -87,6 +66,17 @@ function renderUpload() {
     </div>`;
 }
 
+function onFileChosen(e) {
+  console.log('onFileChosen called', e.target.files);
+  const f = e.target.files[0]; if(!f) return;
+  selectedFile = f;
+  console.log('selectedFile set:', selectedFile);
+  document.getElementById('file-chosen-bar').classList.remove('hidden');
+  document.getElementById('file-chosen-name').textContent = f.name;
+  if (!document.getElementById('material-name').value)
+    document.getElementById('material-name').value = f.name.replace(/\.[^.]+$/,'');
+}
+
 function selectMethod(m) {
   uploadMethod = m;
   document.getElementById('method-camera').classList.toggle('selected', m==='camera');
@@ -95,24 +85,26 @@ function selectMethod(m) {
 
 function triggerFileSelect() { document.getElementById('file-input').click(); }
 
-function onFileChosen(e) {
-  const f = e.target.files[0]; if(!f) return;
-  document.getElementById('file-chosen-bar').classList.remove('hidden');
-  document.getElementById('file-chosen-name').textContent = f.name;
-  if (!document.getElementById('material-name').value)
-    document.getElementById('material-name').value = f.name.replace(/\.[^.]+$/,'');
-}
-
-function startUpload() {
+async function startUpload() {
   const name = document.getElementById('material-name').value.trim() || '無題の資料';
   const cat  = document.getElementById('material-cat').value.trim() || '一般';
-  navigate('analyzing', { materialId:uid(), name, category:cat });
+
+  let base64Image = null;
+  if (selectedFile) {
+    base64Image = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(selectedFile);
+    });
+  }
+
+  navigate('analyzing', { materialId: uid(), name, category: cat, base64Image });
 }
 
 
 /* ============================================================
    AI解析中画面
-   「データ読込→テキスト抽出→問題生成→セット作成」の4ステップを表示する
 ============================================================ */
 function renderAnalyzing(params) {
   return `
@@ -132,39 +124,106 @@ function renderAnalyzing(params) {
     </div>`;
 }
 
-/* ステップアニメーションを順番に実行し、完了後に finishAnalysis() を呼ぶ
-   TODO(AI担当): ここで実際の API 呼び出しを行う（fetch など） */
-function runAIAnalysis(params) {
-  const steps = ['step1','step2','step3','step4'];
-  let i = 0;
-  const tick = () => {
-    const el = document.getElementById(steps[i]); if(!el) return;
-    el.classList.remove('active'); el.classList.add('done');
+async function runAIAnalysis(params) {
+  const completeStep = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('active');
+    el.classList.add('done');
     el.querySelector('.step-dot').style.background = 'var(--green)';
-    i++;
-    if (i < steps.length) {
-      const nx = document.getElementById(steps[i]); if(nx) nx.classList.add('active');
-      setTimeout(tick, 900);
-    } else {
-      finishAnalysis(params);
-    }
   };
-  setTimeout(tick, 800);
+
+  const activateStep = (id) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+  };
+
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  try {
+    // Step 1: ファイル読み込み
+    activateStep('step1');
+    await delay(800);
+    completeStep('step1');
+
+    // Step 2: OCR（テキスト抽出）
+    activateStep('step2');
+    let extractedText = '';
+
+    if (params.base64Image) {
+      const ocrRes = await fetch('/api/AI/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: params.base64Image })
+      });
+      console.log('OCR status:', ocrRes.status);
+      if (!ocrRes.ok) throw new Error('OCRに失敗しました');
+      const ocrData = await ocrRes.json();
+      console.log('OCR response:', ocrData);
+      extractedText = ocrData.text;
+    } else {
+      extractedText = params.name || '資料';
+    }
+
+    completeStep('step2');
+    console.log('OCR抽出テキスト:', extractedText);
+
+    // Step 3: 問題生成
+    activateStep('step3');
+    const genRes = await fetch('/api/AI/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: extractedText })
+    });
+
+    const genText = await genRes.text();
+    console.log('generate status:', genRes.status);
+    console.log('generate response:', genText);
+
+    if (!genRes.ok) throw new Error(`問題生成に失敗しました: ${genText}`);
+    const genData = JSON.parse(genText);
+    completeStep('step3');
+
+    // Step 4: 問題セット作成
+    activateStep('step4');
+    await delay(600);
+    completeStep('step4');
+
+    finishAnalysis(params, genData.questions);
+
+  } catch (err) {
+    console.error('AI解析エラー:', err);
+    const sub = document.querySelector('.analyzing-sub');
+    if (sub) {
+      sub.textContent = `エラー: ${err.message}`;
+      sub.style.color = 'var(--red, #e53e3e)';
+    }
+  }
 }
 
-/* AI解析の完了処理
-   TODO(AI担当): モックデータの代わりに API レスポンスの問題データを使う
-                 サーバー保存が必要な場合はここで DB 保存 API を呼ぶ */
-function finishAnalysis(params) {
+function finishAnalysis(params, apiQuestions) {
   const { materialId, name, category } = params;
+
   S.materials.push({
-    id: materialId, name: name||'無題の資料', type: uploadMethod,
-    filename: name, createdAt: new Date().toISOString(), questionCount: 5, shared: false,
+    id: materialId,
+    name: name || '無題の資料',
+    type: uploadMethod,
+    filename: name,
+    createdAt: new Date().toISOString(),
+    questionCount: apiQuestions?.length || 0,
+    shared: false,
   });
-  const newQs = AI_GENERATED_TEMPLATES.map((q,i) => ({
-    ...q, id:`${materialId}_${i}`, materialId, category: category||q.category,
-  }));
-  S.questions.push(...newQs);
+
+  if (apiQuestions?.length > 0) {
+    const newQs = apiQuestions.map((q, i) => ({
+      ...q,
+      id: `${materialId}_${i}`,
+      materialId,
+      category: category || q.category || '一般',
+    }));
+    S.questions.push(...newQs);
+  }
+
   save();
-  setTimeout(() => navigate('question-edit', {materialId}), 500);
+  setTimeout(() => navigate('question-edit', { materialId }), 500);
 }
