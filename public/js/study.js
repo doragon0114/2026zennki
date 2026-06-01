@@ -9,53 +9,233 @@
        本番では API 経由でユーザーの学習履歴をサーバー保存する
 ============================================================ */
 
+let studyLoaded = false;
+let studyLoading = false;
+
+async function loadStudyDataFromServer() {
+  if (studyLoading) {
+    return;
+  }
+
+  studyLoading = true;
+
+  try {
+    const response = await fetch("/api/study/bootstrap");
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "学習データの取得に失敗しました");
+    }
+
+    S.materials = Array.isArray(data.materials) ? data.materials : [];
+    S.questions = Array.isArray(data.questions) ? data.questions : [];
+
+    if (!S.studyFilter) {
+      S.studyFilter = "すべて";
+    }
+
+    studyLoaded = true;
+    save();
+
+    const loadingEl = document.getElementById("study-loading");
+    if (loadingEl) {
+      navigate("question-set");
+    }
+  } catch {
+    const loadingEl = document.getElementById("study-loading");
+
+    if (loadingEl) {
+      loadingEl.innerHTML = `
+        <div class="empty-icon-wrap">${svg(IC.inbox,48)}</div>
+        <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
+          学習データを取得できませんでした
+        </div>
+        <button class="btn btn-primary mt16" onclick="loadStudyDataFromServer()">
+          再読み込み
+        </button>
+      `;
+    }
+  } finally {
+    studyLoading = false;
+  }
+}
+
+async function saveStudyResultToServer(resultPayload) {
+  try {
+    const response = await fetch("/api/study/results", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(resultPayload)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      return null;
+    }
+
+    return data.result;
+  } catch {
+    return null;
+  }
+}
 
 /* ============================================================
    問題集選択画面
    カテゴリフィルターで絞り込み、学習する問題セットを選ぶ
 ============================================================ */
 function renderQuestionSet() {
-  const categories = ['すべて', ...new Set(S.questions.map(q=>q.category))];
-  const filtered   = S.studyFilter==='すべて' ? S.questions : S.questions.filter(q=>q.category===S.studyFilter);
-  const sets       = S.materials.map(m=>({ mat:m, qs:filtered.filter(q=>q.materialId===m.id) })).filter(x=>x.qs.length>0);
-  const icons      = [svg(IC.leaf,22),svg(IC.bookOpen,22),svg(IC.flask,22),svg(IC.globe,22),svg(IC.pencil,22),svg(IC.dna,22)];
-  const badges     = ['badge-gold','badge-silver','badge-bronze'];
+  if (!S.studyFilter) {
+    S.studyFilter = "すべて";
+  }
 
-  const chips = categories.map(c=>`<button class="chip ${c===S.studyFilter?'active':''}" onclick="setStudyFilter('${esc(c)}')">${esc(c)}</button>`).join('');
-  const cards = sets.length === 0
-    ? `<div style="text-align:center;padding:60px 20px;color:var(--gray)">
-        <div class="empty-icon-wrap">${svg(IC.inbox,48)}</div>
-        <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">問題がありません</div>
-        <div style="font-size:13px">別のカテゴリを選ぶか資料を追加しましょう</div>
-       </div>`
-    : sets.map((x,i)=>`
-        <div class="qset-card" onclick='startStudy(${JSON.stringify(x.qs.map(q=>q.id))})'>
-          <div class="qset-icon color-${i%6}">${icons[i%icons.length]}</div>
-          <div class="qset-info">
-            <div class="qset-title">${esc(x.mat.name)}</div>
-            <div style="margin:3px 0"><span class="tag tag-sky">高校</span><span class="tag tag-green">中級</span></div>
-            <div class="qset-meta">${x.qs.length}問 ・ ${[...new Set(x.qs.map(q=>q.category))].join('・')}</div>
+  if (!Array.isArray(S.questions)) {
+    S.questions = [];
+  }
+
+  if (!Array.isArray(S.materials)) {
+    S.materials = [];
+  }
+
+  if (!studyLoaded) {
+    setTimeout(() => {
+      loadStudyDataFromServer();
+    }, 0);
+
+    return `
+      <div class="screen-header blue-bg">
+        <button class="back-btn" onclick="navigate('home')">←</button>
+        <div class="header-title">演習問題を選択</div>
+      </div>
+      <div class="screen-body">
+        <div id="study-loading" style="text-align:center;padding:80px 20px;color:var(--gray)">
+          <div class="empty-icon-wrap">${svg(IC.inbox,48)}</div>
+          <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
+            演習データを読み込み中です
           </div>
-          <div class="qset-badge ${badges[i%badges.length]}">${['A','B','C'][i%3]}</div>
-        </div>`).join('');
+          <div style="font-size:13px">
+            サーバーから問題集を取得しています...
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const categories = [
+    "すべて",
+    ...new Set(S.questions.map(q => q.category).filter(Boolean))
+  ];
+
+  const filtered = S.studyFilter === "すべて"
+    ? S.questions
+    : S.questions.filter(q => q.category === S.studyFilter);
+
+  const sets = S.materials
+    .map(m => ({
+      mat: m,
+      qs: filtered.filter(q => q.materialId === m.id)
+    }))
+    .filter(x => x.qs.length > 0);
+
+  const icons = [
+    svg(IC.leaf, 22),
+    svg(IC.bookOpen, 22),
+    svg(IC.flask, 22),
+    svg(IC.globe, 22),
+    svg(IC.pencil, 22),
+    svg(IC.dna, 22)
+  ];
+
+  const badges = ["badge-gold", "badge-silver", "badge-bronze"];
+
+  const chips = categories.map(c => `
+    <button class="chip ${c === S.studyFilter ? "active" : ""}" onclick="setStudyFilter('${esc(c)}')">
+      ${esc(c)}
+    </button>
+  `).join("");
+
+  const cards = sets.length === 0
+    ? `
+      <div style="text-align:center;padding:60px 20px;color:var(--gray)">
+        <div class="empty-icon-wrap">${svg(IC.inbox,48)}</div>
+        <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
+          問題がありません
+        </div>
+        <div style="font-size:13px">
+          別のカテゴリを選ぶか資料を追加しましょう
+        </div>
+      </div>
+    `
+    : sets.map((x, i) => `
+      <div class="qset-card" onclick='startStudy(${JSON.stringify(x.qs.map(q => q.id))})'>
+        <div class="qset-icon color-${i % 6}">
+          ${icons[i % icons.length]}
+        </div>
+
+        <div class="qset-info">
+          <div class="qset-title">${esc(x.mat.name)}</div>
+
+          <div style="margin:3px 0">
+            <span class="tag tag-sky">演習</span>
+            <span class="tag tag-green">基礎</span>
+          </div>
+
+          <div class="qset-meta">
+            ${x.qs.length}問 ・ ${[...new Set(x.qs.map(q => q.category).filter(Boolean))].join("・") || "未分類"}
+          </div>
+        </div>
+
+        <div class="qset-badge ${badges[i % badges.length]}">
+          ${["A", "B", "C"][i % 3]}
+        </div>
+      </div>
+    `).join("");
 
   return `
     <div class="screen-header blue-bg">
       <button class="back-btn" onclick="navigate('home')">←</button>
-      <div class="header-title">問題集を選択</div>
+      <div class="header-title">演習問題を選択</div>
     </div>
-    <div class="category-chips">${chips}</div>
-    <div class="screen-body" style="padding-top:8px">${cards}</div>`;
+
+    <div class="category-chips">
+      ${chips}
+    </div>
+
+    <div class="screen-body" style="padding-top:8px">
+      ${cards}
+    </div>
+  `;
 }
 
-function setStudyFilter(cat) { S.studyFilter=cat; navigate('question-set'); }
+function setStudyFilter(cat) {
+  S.studyFilter = cat || "すべて";
+  navigate("question-set");
+}
 
 /* 学習セッションを開始する */
 function startStudy(qids) {
-  const qs = qids.map(id=>S.questions.find(q=>q.id===id)).filter(Boolean);
-  if (!qs.length) { alert('問題がありません'); return; }
-  S.studySession = { questions:shuffle(qs), current:0, answers:[], startTime:Date.now() };
-  navigate('question', { mode:'study' });
+  const qs = qids
+    .map(id => S.questions.find(q => q.id === id))
+    .filter(Boolean);
+
+  if (!qs.length) {
+    alert("問題がありません");
+    return;
+  }
+
+  S.studySession = {
+    questions: shuffle(qs),
+    current: 0,
+    answers: [],
+    startTime: Date.now(),
+    startedAt: new Date().toISOString()
+  };
+
+  navigate("question", {
+    mode: "study"
+  });
 }
 
 
@@ -81,7 +261,7 @@ function renderQuestion() {
         <div class="streak-badge">${svg(IC.flame,14)}<span>${current}</span></div>
       </div>
       <div class="q-card fade-in">
-        <span class="q-num-badge">問題 ${current+1} · ${esc(q.category)}</span>
+        <span class="q-num-badge">問題 ${current+1} · ${esc(q.category || '未分類')}</span>
         <div class="q-text">${esc(q.text)}</div>
       </div>
       <div class="choices" id="choices-area">
@@ -102,9 +282,22 @@ function renderQuestion() {
 /* 選択肢が押されたとき：正誤を判定してフィードバックを表示する */
 function answerStudy(chosen) {
   const sess = S.studySession;
-  const q    = sess.questions[sess.current];
-  const ok   = chosen === q.correct;
-  sess.answers.push({ questionId:q.id, chosen, correct:ok });
+
+  if (!sess) {
+    return;
+  }
+
+  if (sess.answers[sess.current]) {
+    return;
+  }
+
+  const q = sess.questions[sess.current];
+  const ok = chosen === q.correct;
+  sess.answers[sess.current] = {
+    questionId: q.id,
+    chosen,
+    correct: ok
+  };
   const labels = ['A','B','C','D'];
   document.querySelectorAll('.choice-btn').forEach((btn,i)=>{
     btn.classList.add('disabled');
@@ -123,27 +316,117 @@ function answerStudy(chosen) {
 }
 
 function nextQuestion() {
-  S.studySession.current++;
-  if (S.studySession.current >= S.studySession.questions.length) finishStudy();
-  else navigate('question', { mode:'study' });
+  const sess = S.studySession;
+
+  if (!sess) {
+    navigate("question-set");
+    return;
+  }
+
+  sess.current++;
+
+  if (sess.current >= sess.questions.length) {
+    finishStudy();
+  } else {
+    navigate("question", {
+      mode: "study"
+    });
+  }
 }
 
 /* TODO(DB担当): ここでサーバーへ学習結果を保存する */
-function finishStudy() {
-  S.user.totalStudied++;
+async function finishStudy() {
+  const sess = S.studySession;
+
+  if (!sess) {
+    navigate("question-set");
+    return;
+  }
+
+  const answers = sess.answers.filter(Boolean);
+  const correct = answers.filter(answer => answer.correct).length;
+  const pointsGained = correct * 10;
+
+  S.user.totalStudied = Number(S.user.totalStudied || 0) + 1;
+  S.user.points = Number(S.user.points || 0) + pointsGained;
   save();
-  navigate('result', { answers:S.studySession.answers, questions:S.studySession.questions });
+
+  const resultPayload = {
+    answers,
+    questions: sess.questions,
+    startedAt: sess.startedAt,
+    finishedAt: new Date().toISOString()
+  };
+
+  await saveStudyResultToServer(resultPayload);
+
+  await recordCalendarActivity({
+    type: "study",
+    sourceId: "study",
+    points: pointsGained
+  });
+
+  navigate("result", {
+    answers,
+    questions: sess.questions
+  });
 }
 
 function confirmQuit() { if (confirm('演習を中断しますか？')) navigate('question-set'); }
 
 
+async function recordCalendarActivity(payload = {}) {
+  try {
+    const userId = S.user.userId || S.user.id || S.user.email || S.user.name || "";
+
+    await fetch("/api/calendar/activity", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        userId,
+        type: payload.type || "study",
+        sourceId: payload.sourceId || null,
+        points: Number(payload.points || 0)
+      })
+    });
+
+    if (typeof markHomeCalendarDirty === "function") {
+      markHomeCalendarDirty();
+    }
+  } catch {
+    // カレンダー記録に失敗しても演習結果画面は表示する
+  }
+}
+
 /* ============================================================
    学習結果画面
    正答率・ランク・獲得ポイント・全問題の解説を表示する
 ============================================================ */
-function renderResult(params) {
-  const { answers, questions } = params;
+function renderResult(params = {}) {
+  const answers = Array.isArray(params.answers) ? params.answers : [];
+  const questions = Array.isArray(params.questions) ? params.questions : [];
+
+  if (!answers.length || !questions.length) {
+    return `
+      <div class="screen-header blue-bg">
+        <button class="back-btn" onclick="navigate('question-set')">←</button>
+        <div class="header-title">学習結果</div>
+      </div>
+      <div class="screen-body">
+        <div style="text-align:center;padding:60px 20px;color:var(--gray)">
+          <div class="empty-icon-wrap">${svg(IC.inbox,48)}</div>
+          <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
+            結果データがありません
+          </div>
+          <button class="btn btn-primary mt16" onclick="navigate('question-set')">
+            問題集へ戻る
+          </button>
+        </div>
+      </div>
+    `;
+  }
   const correct      = answers.filter(a=>a.correct).length;
   const total        = answers.length;
   const pct          = Math.round((correct/total)*100);

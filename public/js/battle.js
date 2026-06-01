@@ -203,6 +203,7 @@ async function runMatchmaking() {
 
     sendBattleMessage({
       type: "join",
+      userId: S.user.userId || S.user.id || S.user.email || S.user.name,
       name: S.user.name || S.user.username || "ゲスト",
       age,
       subject,
@@ -219,6 +220,9 @@ let battleWs = null;
 let battlePlayerId = null;
 let battleRoomId = null;
 let battleWaitingResult = false;
+let battleHistoryLoaded = false;
+let battleHistoryLoading = false;
+let battleHistoryItems = [];
 
 const BATTLE_POINT_WIN = 30;
 const BATTLE_POINT_DRAW = 10;
@@ -230,6 +234,55 @@ const BATTLE_SUBJECT_LABELS = {
   science: "理科",
   social: "社会"
 };
+
+async function loadBattleHistoryFromServer(force = false) {
+  if (battleHistoryLoading) {
+    return;
+  }
+
+  if (battleHistoryLoaded && !force) {
+    return;
+  }
+
+  battleHistoryLoading = true;
+
+  try {
+    const userId = encodeURIComponent(S.user.userId || S.user.id || S.user.email || S.user.name || "");
+
+    const response = await fetch(`/api/battle/history?userId=${userId}`);
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "対戦履歴の取得に失敗しました");
+    }
+
+    battleHistoryItems = Array.isArray(data.history) ? data.history : [];
+    battleHistoryLoaded = true;
+
+    const loadingEl = document.getElementById("battle-history-loading");
+    if (loadingEl) {
+      navigate("battle-history");
+    }
+  } catch {
+    const loadingEl = document.getElementById("battle-history-loading");
+
+    if (loadingEl) {
+      loadingEl.innerHTML = `
+        <div style="text-align:center;padding:60px 20px;color:var(--gray)">
+          <div class="empty-icon-wrap">${svg(IC.swords,48)}</div>
+          <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
+            対戦履歴を取得できませんでした
+          </div>
+          <button class="btn btn-primary mt16" onclick="loadBattleHistoryFromServer(true)">
+            再読み込み
+          </button>
+        </div>
+      `;
+    }
+  } finally {
+    battleHistoryLoading = false;
+  }
+}
 
 function getBattleSubject() {
   const el = document.getElementById("battle-subject");
@@ -629,50 +682,119 @@ function renderBattleResult() {
    TODO(DB担当): MOCK_HISTORY をサーバーから取得した実データに差し替える
 ============================================================ */
 function renderBattleHistory() {
-  const MOCK_HISTORY = [
-    { date:'2026/05/18', opponent:'田中 太郎',   avatar:'🐧', result:'win',  myScore:4, oppScore:2, pts:+30 },
-    { date:'2026/05/17', opponent:'鈴木 花子',   avatar:'🦊', result:'lose', myScore:2, oppScore:4, pts:-10 },
-    { date:'2026/05/17', opponent:'山田 一郎',   avatar:'🐻', result:'win',  myScore:5, oppScore:1, pts:+30 },
-    { date:'2026/05/16', opponent:'佐藤 美咲',   avatar:'🐱', result:'draw', myScore:3, oppScore:3, pts:+10 },
-    { date:'2026/05/15', opponent:'伊藤 健太',   avatar:'🐼', result:'lose', myScore:1, oppScore:5, pts:-10 },
-    { date:'2026/05/14', opponent:'渡辺 さくら', avatar:'🦋', result:'win',  myScore:4, oppScore:3, pts:+30 },
-    { date:'2026/05/13', opponent:'田中 太郎',   avatar:'🐧', result:'win',  myScore:5, oppScore:0, pts:+30 },
-  ];
+  if (!battleHistoryLoaded) {
+    setTimeout(() => {
+      loadBattleHistoryFromServer(true);
+    }, 0);
 
-  const wins  = MOCK_HISTORY.filter(h=>h.result==='win').length;
-  const loses = MOCK_HISTORY.filter(h=>h.result==='lose').length;
-  const draws = MOCK_HISTORY.filter(h=>h.result==='draw').length;
-  const resultLabel = { win:'勝利', lose:'敗北', draw:'引き分け' };
-  const resultClass = { win:'bh-win', lose:'bh-lose', draw:'bh-draw' };
-
-  const rows = MOCK_HISTORY.map(h => `
-    <div class="bh-row">
-      <div class="bh-avatar">${getAvatarHTML(h.avatar,36)}</div>
-      <div class="bh-info">
-        <div class="bh-opponent">${esc(h.opponent)}</div>
-        <div class="bh-date">${h.date}</div>
+    return `
+      <div class="screen-header">
+        <button class="back-btn" onclick="navigate('mypage')"></button>
+        <div class="header-title">対戦履歴</div>
+        <div style="width:40px"></div>
       </div>
-      <div class="bh-score">${h.myScore} - ${h.oppScore}</div>
-      <div class="bh-result ${resultClass[h.result]}">${resultLabel[h.result]}</div>
-      <div class="bh-pts ${h.pts>0?'bh-pts-pos':h.pts<0?'bh-pts-neg':'bh-pts-zero'}">${h.pts>0?'+':''}${h.pts}pt</div>
-    </div>`).join('');
+
+      <div class="screen-body" id="battle-history-loading">
+        <div style="text-align:center;padding:60px 20px;color:var(--gray)">
+          <div class="empty-icon-wrap">${svg(IC.swords,48)}</div>
+          <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
+            対戦履歴を読み込み中です
+          </div>
+          <div style="font-size:13px">
+            サーバーから履歴を取得しています...
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const history = battleHistoryItems;
+
+  const wins = history.filter(h => h.result === "win").length;
+  const loses = history.filter(h => h.result === "lose").length;
+  const draws = history.filter(h => h.result === "draw").length;
+
+  const resultLabel = {
+    win: "勝利",
+    lose: "敗北",
+    draw: "引き分け"
+  };
+
+  const resultClass = {
+    win: "bh-win",
+    lose: "bh-lose",
+    draw: "bh-draw"
+  };
+
+  const rows = history.length === 0
+    ? `
+      <div style="text-align:center;padding:60px 20px;color:var(--gray)">
+        <div class="empty-icon-wrap">${svg(IC.swords,48)}</div>
+        <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
+          対戦履歴がありません
+        </div>
+        <div style="font-size:13px">
+          対戦をするとここに履歴が表示されます
+        </div>
+        <button class="btn btn-danger mt16" onclick="navigate('battle-start')">
+          対戦する
+        </button>
+      </div>
+    `
+    : history.map(h => `
+      <div class="bh-row">
+        <div class="bh-avatar">${getAvatarHTML(h.avatar || "🤖", 36)}</div>
+
+        <div class="bh-info">
+          <div class="bh-opponent">${esc(h.opponent || "対戦相手")}</div>
+          <div class="bh-date">${esc(h.date || "")}</div>
+        </div>
+
+        <div class="bh-score">${Number(h.myScore || 0)} - ${Number(h.oppScore || 0)}</div>
+
+        <div class="bh-result ${resultClass[h.result] || "bh-draw"}">
+          ${resultLabel[h.result] || "引き分け"}
+        </div>
+
+        <div class="bh-pts ${Number(h.pts || 0) > 0 ? "bh-pts-pos" : Number(h.pts || 0) < 0 ? "bh-pts-neg" : "bh-pts-zero"}">
+          ${Number(h.pts || 0) > 0 ? "+" : ""}${Number(h.pts || 0)}pt
+        </div>
+      </div>
+    `).join("");
 
   return `
     <div class="screen-header">
       <button class="back-btn" onclick="navigate('mypage')"></button>
       <div class="header-title">対戦履歴</div>
-      <div style="width:40px"></div>
+      <button class="header-action" onclick="refreshBattleHistory()">更新</button>
     </div>
+
     <div class="screen-body">
       <div class="bh-summary">
-        <div class="bh-summary-item"><div class="bh-summary-num win">${wins}</div><div class="bh-summary-lbl">勝利</div></div>
+        <div class="bh-summary-item">
+          <div class="bh-summary-num win">${wins}</div>
+          <div class="bh-summary-lbl">勝利</div>
+        </div>
         <div class="bh-summary-sep"></div>
-        <div class="bh-summary-item"><div class="bh-summary-num draw">${draws}</div><div class="bh-summary-lbl">引き分け</div></div>
+        <div class="bh-summary-item">
+          <div class="bh-summary-num draw">${draws}</div>
+          <div class="bh-summary-lbl">引き分け</div>
+        </div>
         <div class="bh-summary-sep"></div>
-        <div class="bh-summary-item"><div class="bh-summary-num lose">${loses}</div><div class="bh-summary-lbl">敗北</div></div>
+        <div class="bh-summary-item">
+          <div class="bh-summary-num lose">${loses}</div>
+          <div class="bh-summary-lbl">敗北</div>
+        </div>
       </div>
+
       <div class="bh-list">${rows}</div>
-    </div>`;
+    </div>
+  `;
+}
+
+function refreshBattleHistory() {
+  battleHistoryLoaded = false;
+  loadBattleHistoryFromServer(true);
 }
 
 function handleBattleServerMessage(data) {
@@ -943,6 +1065,8 @@ function handleBattleFinished(data) {
     sess.pointsApplied = true;
     save();
   }
+
+  battleHistoryLoaded = false;
 
   navigate("battle-result", {});
 }

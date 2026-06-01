@@ -25,6 +25,17 @@
       "passwordHash": "4450a513aa9a5c09760b38d1d7a729b274bff95010ebc7c8645f67bebf276afae12c45321fb0da635cf0198b61c35ecee957d4ce773b8bc4c3045f5d1cb6feec",
       "createdAt": "2026-05-27T01:43:46.076Z",
       "updatedAt": "2026-05-27T01:44:22.516Z"
+    },
+    {
+      "userId": "user_1b3d73dbb8",
+      "username": "あrfrf",
+      "profile": "",
+      "userTagIds": [],
+      "email": "user@gmailcom",
+      "salt": "32d4cc139af069184c62d3db052fc7ea",
+      "passwordHash": "1ad153eceeba61cc076d403619ef8adc796f0d0cb65a4115a559a2c704dcb519202ae8ae44fc0fda81402d849f8459eb9691f5513ec4b82c08871bc1c738c0a9",
+      "createdAt": "2026-06-01T05:00:32.522Z",
+      "updatedAt": "2026-06-01T05:00:32.522Z"
     }
   ]
 }
