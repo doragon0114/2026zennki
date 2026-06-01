@@ -12,6 +12,7 @@ const studyRoutes = require("./features/study/studyRoutes");
 const aiRoutes = require("./features/AI/aiRoutes");  // 追加
 const materialsRoutes = require("./features/materials/materialsRoutes");
 const battleHistoryRoutes = require("./features/battle/battleHistoryRoutes");
+const calendarRoutes = require("./features/calendar/calendarRoutes");
 
 const { initBattleWebSocket } = require("./features/battle/battleSocket");
 
@@ -26,6 +27,7 @@ app.use(express.json({ limit: "10mb" }));  // 変更: 画像base64転送に対�
 app.use(express.urlencoded({ extended: true }));
 app.use("/api/materials", materialsRoutes);
 app.use("/api/battle", battleHistoryRoutes);
+app.use("/api/calendar", calendarRoutes);
 
 // ===== セッション設定 =====
 app.use(

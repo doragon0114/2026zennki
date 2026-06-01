@@ -10,57 +10,132 @@
      ・クイックモード（個人学習 / 対戦モード）
 ============================================================ */
 
+let homeCalendarLoaded = false;
+let homeCalendarLoading = false;
+let homeCalendarSummary = null;
+
+async function loadHomeCalendarFromServer(force = false) {
+  if (homeCalendarLoading) {
+    return;
+  }
+
+  if (homeCalendarLoaded && !force) {
+    return;
+  }
+
+  homeCalendarLoading = true;
+
+  try {
+    const userId = encodeURIComponent(S.user.userId || S.user.id || S.user.email || S.user.name || "");
+    const response = await fetch(`/api/calendar/summary?userId=${userId}`);
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "カレンダー情報の取得に失敗しました");
+    }
+
+    homeCalendarSummary = {
+      streak: Number(data.streak || 0),
+      studied: Number(data.studied || 0),
+      total: Number(data.total || 7),
+      days: Array.isArray(data.days) ? data.days : []
+    };
+
+    homeCalendarLoaded = true;
+
+    const calendarEl = document.getElementById("home-calendar-card");
+    if (calendarEl) {
+      navigate("home");
+    }
+  } catch {
+    homeCalendarSummary = null;
+  } finally {
+    homeCalendarLoading = false;
+  }
+}
+
+function markHomeCalendarDirty() {
+  homeCalendarLoaded = false;
+}
 
 /* 学習カレンダーカードを生成する（今日を含む直近7日間を表示） */
 function renderHomeCalendar() {
-  const today = new Date();
-  const weekDays = Array.from({length:7}, (_,i)=>{
-    const d = new Date(today); d.setDate(today.getDate() - 6 + i); return d;
-  });
-  const dayLabelsByDow = ['日','月','火','水','木','金','土'];
-  const streak = 14;
+  if (!homeCalendarLoaded) {
+    setTimeout(() => {
+      loadHomeCalendarFromServer();
+    }, 0);
+  }
 
-  const cells = weekDays.map((d) => {
-    const isToday = d.toDateString() === today.toDateString();
-    const cls     = isToday ? 'today' : 'done';
-    const dow     = d.getDay();
-    const colorCls = dow===0 ? 'sun' : (dow===6 ? 'sat' : '');
+  const today = new Date();
+  const dayLabelsByDow = ["日", "月", "火", "水", "木", "金", "土"];
+
+  const fallbackDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - 6 + i);
+
+    return {
+      day: d.getDate(),
+      dow: d.getDay(),
+      studied: false,
+      isToday: d.toDateString() === today.toDateString()
+    };
+  });
+
+  const summary = homeCalendarSummary || {
+    streak: 0,
+    studied: 0,
+    total: 7,
+    days: fallbackDays
+  };
+
+  const cells = summary.days.map(day => {
+    const cls = day.isToday ? "today" : day.studied ? "done" : "";
+    const colorCls = day.dow === 0 ? "sun" : day.dow === 6 ? "sat" : "";
+
     return `
       <div class="cal-cell ${cls} ${colorCls}">
-        <div class="cal-cell-dow">${dayLabelsByDow[dow]}</div>
-        <div class="cal-cell-num">${d.getDate()}</div>
+        <div class="cal-cell-dow">${dayLabelsByDow[day.dow]}</div>
+        <div class="cal-cell-num">${day.day}</div>
         <div class="cal-cell-mark">
-          ${cls==='done'
+          ${day.studied
             ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
-            : `<span class="cal-today-dot"></span>`}
+            : day.isToday
+              ? `<span class="cal-today-dot"></span>`
+              : ``}
         </div>
       </div>`;
-  }).join('');
+  }).join("");
 
-  const year    = today.getFullYear();
-  const month   = today.getMonth() + 1;
-  const studied = 6;
-  const total   = 7;
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1;
+  const streak = summary.streak;
+  const studied = summary.studied;
+  const total = summary.total || 7;
 
   return `
-    <div class="cal-card">
+    <div class="cal-card" id="home-calendar-card">
       <div class="cal-head">
         <div class="cal-head-title">学習カレンダー</div>
         <div class="cal-head-month">${year}年${month}月</div>
       </div>
+
       <div class="cal-streak">
         <div class="cal-streak-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5c0 2 1.5 3.5 3.5 3.5s3.5-1.5 3.5-3.5c0-3-2.5-3-2.5-6 0 0 0-2-2-2-2 0-2 2-2 2 0 3-2.5 3-2.5 6z" fill="currentColor" fill-opacity=".25"/><path d="M12 3c0 3 4 4 4 9a4 4 0 0 1-8 0c0-2 1-3 2-4 1-1 2-3 2-5z"/></svg>
         </div>
+
         <div class="cal-streak-text">
           <div class="cal-streak-big"><strong>${streak}</strong>日連続学習中</div>
           <div class="cal-streak-sub">この調子でがんばろう！</div>
         </div>
+
         <div class="cal-streak-bar">
-          <div class="cal-streak-bar-fill" style="width:${Math.min(100,(studied/total)*100)}%"></div>
+          <div class="cal-streak-bar-fill" style="width:${Math.min(100, (studied / total) * 100)}%"></div>
         </div>
       </div>
+
       <div class="cal-week">${cells}</div>
+
       <div class="cal-legend">
         <div class="cal-legend-item"><span class="cal-legend-dot done"></span>完了</div>
         <div class="cal-legend-item"><span class="cal-legend-dot today"></span>今日</div>

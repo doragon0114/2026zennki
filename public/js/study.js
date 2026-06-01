@@ -360,6 +360,12 @@ async function finishStudy() {
 
   await saveStudyResultToServer(resultPayload);
 
+  await recordCalendarActivity({
+    type: "study",
+    sourceId: "study",
+    points: pointsGained
+  });
+
   navigate("result", {
     answers,
     questions: sess.questions
@@ -368,6 +374,31 @@ async function finishStudy() {
 
 function confirmQuit() { if (confirm('演習を中断しますか？')) navigate('question-set'); }
 
+
+async function recordCalendarActivity(payload = {}) {
+  try {
+    const userId = S.user.userId || S.user.id || S.user.email || S.user.name || "";
+
+    await fetch("/api/calendar/activity", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        userId,
+        type: payload.type || "study",
+        sourceId: payload.sourceId || null,
+        points: Number(payload.points || 0)
+      })
+    });
+
+    if (typeof markHomeCalendarDirty === "function") {
+      markHomeCalendarDirty();
+    }
+  } catch {
+    // カレンダー記録に失敗しても演習結果画面は表示する
+  }
+}
 
 /* ============================================================
    学習結果画面
