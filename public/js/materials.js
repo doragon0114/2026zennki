@@ -14,7 +14,73 @@
 /* ============================================================
    セット一覧画面
 ============================================================ */
+let materialsLoaded = false;
+let materialsLoading = false;
+
+async function loadMaterialsFromServer(force = false) {
+  if (materialsLoading) {
+    return;
+  }
+
+  if (materialsLoaded && !force) {
+    return;
+  }
+
+  materialsLoading = true;
+
+  try {
+    const response = await fetch("/api/materials");
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "問題セットの取得に失敗しました");
+    }
+
+    applyMaterialsPayload(data);
+    materialsLoaded = true;
+    save();
+  } catch {
+    alert("問題セットをサーバーから取得できませんでした。");
+  } finally {
+    materialsLoading = false;
+  }
+}
+
+function applyMaterialsPayload(data) {
+  S.materials = Array.isArray(data.materials) ? data.materials : [];
+  S.questions = Array.isArray(data.questions) ? data.questions : [];
+}
+
+function renderMaterialsLoading(title = "セット一覧") {
+  return `
+    <div class="screen-header blue-bg">
+      <button class="back-btn" onclick="navigate('home')">←</button>
+      <div class="header-title">${esc(title)}</div>
+      <button class="header-action" onclick="navigate('upload')">＋追加</button>
+    </div>
+    <div class="screen-body">
+      <div style="text-align:center;padding:80px 20px;color:var(--gray)">
+        <div class="empty-icon-wrap">${svg(IC.folder,52)}</div>
+        <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
+          問題セットを読み込み中です
+        </div>
+        <div style="font-size:13px">
+          studyData.json からデータを取得しています...
+        </div>
+      </div>
+    </div>
+  `;
+}
 function renderMaterials() {
+  if (!materialsLoaded) {
+    setTimeout(async () => {
+      await loadMaterialsFromServer(true);
+      navigate("materials");
+    }, 0);
+
+    return renderMaterialsLoading("セット一覧");
+  }
+
   const items = S.materials.length === 0
     ? `<div style="text-align:center;padding:60px 20px">
         <div class="empty-icon-wrap">${svg(IC.folder,52)}</div>
@@ -22,24 +88,37 @@ function renderMaterials() {
         <div style="font-size:13px;color:var(--gray);margin-bottom:20px">資料をアップロードしてAIで問題を生成しましょう</div>
         <button class="btn btn-primary btn-sm" onclick="navigate('upload')">${svg(IC.zap,14)} 資料をアップロード</button>
        </div>`
-    : S.materials.map(m => {
-        const qc       = S.questions.filter(q=>q.materialId===m.id).length;
-        const matIcons = [svg(IC.leaf,22),svg(IC.bookOpen,22),svg(IC.flask,22),svg(IC.globe,22),svg(IC.pencil,22),svg(IC.dna,22),svg(IC.map,22)];
-        const idx      = S.materials.indexOf(m);
-        const icon     = matIcons[idx % matIcons.length];
-        const pct      = Math.min(95, 40 + idx*15);
+    : S.materials.map((m, idx) => {
+        const qc = S.questions.filter(q => q.materialId === m.id).length;
+        const matIcons = [
+          svg(IC.leaf,22),
+          svg(IC.bookOpen,22),
+          svg(IC.flask,22),
+          svg(IC.globe,22),
+          svg(IC.pencil,22),
+          svg(IC.dna,22),
+          svg(IC.map,22)
+        ];
+        const icon = matIcons[idx % matIcons.length];
+        const pct = Math.min(95, 40 + idx * 15);
+
         return `
-          <div class="mini-set-card" onclick="navigate('question-edit',{materialId:'${m.id}'})" style="padding:16px">
+          <div class="mini-set-card" onclick="navigate('question-edit',{materialId:'${esc(m.id)}'})" style="padding:16px">
             <div class="mini-set-icon color-${idx%6}">${icon}</div>
             <div class="mini-set-info">
               <div class="mini-set-title" style="font-size:14px">${esc(m.name)}</div>
-              <div style="margin:4px 0">${m.shared?'<span class="tag tag-green">公開中</span>':'<span class="tag tag-gray">非公開</span>'}<span class="tag tag-sky">${esc(m.type==='camera'?'カメラ':'ファイル')}</span></div>
-              <div class="mini-set-bar-bg"><div class="mini-set-bar-fill" style="width:${pct}%"></div></div>
-              <div class="mini-set-meta">${fmtDate(m.createdAt)} ・ ${qc}問</div>
+              <div style="margin:4px 0">
+                ${m.shared ? '<span class="tag tag-green">公開中</span>' : '<span class="tag tag-gray">非公開</span>'}
+                <span class="tag tag-sky">${esc(m.type === "camera" ? "カメラ" : "ファイル")}</span>
+              </div>
+              <div class="mini-set-bar-bg">
+                <div class="mini-set-bar-fill" style="width:${pct}%"></div>
+              </div>
+              <div class="mini-set-meta">${fmtDate(m.createdAt || new Date().toISOString())} ・ ${qc}問</div>
             </div>
             <div style="color:var(--gray);font-size:18px">›</div>
           </div>`;
-      }).join('');
+      }).join("");
 
   return `
     <div class="screen-header blue-bg">
@@ -54,11 +133,37 @@ function renderMaterials() {
 /* ============================================================
    問題確認・編集画面
 ============================================================ */
-function renderQuestionEdit(params) {
+function renderQuestionEdit(params = {}) {
   const { materialId } = params;
-  const mat   = S.materials.find(m=>m.id===materialId);
-  const qs    = S.questions.filter(q=>q.materialId===materialId);
-  const title = mat ? esc(mat.name) : '問題確認・編集';
+
+  if (!materialId) {
+    return `
+      <div class="screen-header blue-bg">
+        <button class="back-btn" onclick="navigate('materials')">←</button>
+        <div class="header-title">問題確認・編集</div>
+      </div>
+      <div class="screen-body">
+        <div style="text-align:center;padding:60px 20px;color:var(--gray)">
+          <div class="empty-icon-wrap">${svg(IC.help,40)}</div>
+          <div style="font-weight:800;color:var(--dark);margin-bottom:6px">問題セットが選択されていません</div>
+          <button class="btn btn-primary mt16" onclick="navigate('materials')">セット一覧へ戻る</button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (!materialsLoaded) {
+    setTimeout(async () => {
+      await loadMaterialsFromServer(true);
+      navigate("question-edit", { materialId });
+    }, 0);
+
+    return renderMaterialsLoading("問題確認・編集");
+  }
+
+  const mat = S.materials.find(m => m.id === materialId);
+  const qs = S.questions.filter(q => q.materialId === materialId);
+  const title = mat ? esc(mat.name) : "問題確認・編集";
 
   const items = qs.length === 0
     ? `<div style="text-align:center;padding:40px 20px;color:var(--gray)">
@@ -66,62 +171,134 @@ function renderQuestionEdit(params) {
         <div style="font-weight:800;color:var(--dark);margin-bottom:6px">問題がありません</div>
         <div style="font-size:13px">下のボタンから手動追加できます</div>
        </div>`
-    : qs.map((q,i) => `
-        <div class="qedit-item" id="qitem-${q.id}">
+    : qs.map((q, i) => `
+        <div class="qedit-item" id="qitem-${esc(q.id)}">
           <div class="qedit-header">
-            <div class="qedit-num">Q${i+1}</div>
+            <div class="qedit-num">Q${i + 1}</div>
             <div class="qedit-text">${esc(q.text)}</div>
             <div class="qedit-actions">
-              <button class="btn btn-outline btn-xs" onclick="openEdit('${q.id}')">編集</button>
-              <button class="btn btn-danger btn-xs" onclick="deleteQuestion('${q.id}')">削除</button>
+              <button class="btn btn-outline btn-xs" onclick="openEdit('${esc(q.id)}')">編集</button>
+              <button class="btn btn-danger btn-xs" onclick="deleteQuestion('${esc(q.id)}')">削除</button>
             </div>
           </div>
+
           <div class="qedit-choices">
-            ${q.choices.map((c,ci)=>`<div class="qedit-choice ${ci===q.correct?'correct':''}"><span class="qedit-choice-label">${ci===q.correct?'✓':String.fromCharCode(65+ci)}</span><span>${esc(c)}</span></div>`).join('')}
+            ${q.choices.map((c, ci) => `
+              <div class="qedit-choice ${ci === q.correct ? "correct" : ""}">
+                <span class="qedit-choice-label">${ci === q.correct ? "✓" : String.fromCharCode(65 + ci)}</span>
+                <span>${esc(c)}</span>
+              </div>
+            `).join("")}
           </div>
+
           <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">
-            <span class="tag tag-blue">${esc(q.category)}</span>
-            ${(q.tags||[]).map(t=>`<span class="tag tag-gray">${esc(t)}</span>`).join('')}
+            <span class="tag tag-blue">${esc(q.category || "一般")}</span>
+            ${(q.tags || []).map(t => `<span class="tag tag-gray">${esc(t)}</span>`).join("")}
           </div>
-        </div>`).join('');
+        </div>
+      `).join("");
 
   return `
     <div class="screen-header blue-bg">
       <button class="back-btn" onclick="navigate('materials')">←</button>
       <div class="header-title">${title}</div>
-      <button class="header-action" onclick="openAddQuestion('${materialId}')">＋追加</button>
+      <button class="header-action" onclick="openAddQuestion('${esc(materialId)}')">＋追加</button>
     </div>
+
     <div class="screen-body">
       ${mat && mat.shared
-        ? '<div class="alert alert-success">✓ この問題セットは公開中です</div>'
-        : `<div style="display:flex;gap:8px;margin-bottom:14px">
-             <button class="btn btn-outline-gray btn-sm" onclick="shareSet('${materialId}')">${svg(IC.share,14)} 公開・共有</button>
-             <button class="btn btn-primary btn-sm" onclick="navigate('question-set')">▶ 学習する</button>
-           </div>`}
+        ? `
+          <div class="alert alert-success">✓ この問題セットは公開中です</div>
+          <div style="display:flex;gap:8px;margin-bottom:14px">
+            <button class="btn btn-outline-gray btn-sm" onclick="shareSet('${esc(materialId)}', false)">
+              非公開にする
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="navigate('question-set')">▶ 学習する</button>
+          </div>
+        `
+        : `
+          <div style="display:flex;gap:8px;margin-bottom:14px">
+            <button class="btn btn-outline-gray btn-sm" onclick="shareSet('${esc(materialId)}', true)">
+              ${svg(IC.share,14)} 公開・共有
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="navigate('question-set')">▶ 学習する</button>
+          </div>
+        `}
       ${items}
     </div>
+
     <div id="edit-modal-root"></div>`;
 }
 
 /* 問題を削除する
    TODO(DB担当): save() の後にサーバー削除 API も呼ぶ */
-function deleteQuestion(qid) {
-  if (!confirm('この問題を削除しますか？')) return;
-  const q   = S.questions.find(x=>x.id===qid);
-  const mid = q?.materialId;
-  S.questions = S.questions.filter(q=>q.id!==qid);
-  save();
-  const el = document.getElementById(`qitem-${qid}`);
-  if (el) el.remove();
+async function deleteQuestion(qid) {
+  if (!confirm("この問題を削除しますか？")) {
+    return;
+  }
+
+  const q = S.questions.find(item => item.id === qid);
+  const materialId = q?.materialId;
+
+  if (!q || !materialId) {
+    alert("削除する問題が見つかりません");
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/materials/${encodeURIComponent(materialId)}/questions/${encodeURIComponent(qid)}`, {
+      method: "DELETE"
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      alert(data.message || "問題の削除に失敗しました");
+      return;
+    }
+
+    applyMaterialsPayload(data.payload || data);
+    save();
+
+    navigate("question-edit", { materialId });
+  } catch {
+    alert("通信エラーが発生しました");
+  }
 }
 
 /* 問題セットを公開する
    TODO(DB担当): サーバーへ公開フラグを送信する */
-function shareSet(materialId) {
-  const mat = S.materials.find(m=>m.id===materialId);
-  if (mat) { mat.shared=true; save(); }
-  alert('問題セットを公開しました！\n他のユーザーがこのセットを学習できるようになりました。');
-  navigate('question-edit', { materialId });
+async function shareSet(materialId, shared = true) {
+  try {
+    const response = await fetch(`/api/materials/${encodeURIComponent(materialId)}/share`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        shared
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      alert(data.message || "公開状態の更新に失敗しました");
+      return;
+    }
+
+    applyMaterialsPayload(data.payload || data);
+    save();
+
+    alert(shared
+      ? "問題セットを公開しました！\n他のユーザーがこのセットを学習できるようになりました。"
+      : "問題セットを非公開にしました。"
+    );
+
+    navigate("question-edit", { materialId });
+  } catch {
+    alert("通信エラーが発生しました");
+  }
 }
 
 /* 問題編集モーダルを開く */
@@ -187,24 +364,96 @@ function openAddQuestion(materialId) {
 
 /* 編集・追加を保存する
    TODO(DB担当): save() の後にサーバー保存 API も呼ぶ */
-function saveEdit() {
-  const text = document.getElementById('edit-q-text').value.trim();
-  if (!text) { alert('問題文を入力してください'); return; }
-  const choices = [0,1,2,3].map(i=>document.getElementById(`edit-c${i}`).value.trim());
-  if (choices.some(c=>!c)) { alert('すべての選択肢を入力してください'); return; }
-  const correctEl    = document.querySelector('input[name="correct-choice"]:checked');
-  const correct      = correctEl ? parseInt(correctEl.value) : 0;
-  const explanation  = document.getElementById('edit-explain').value.trim();
-  const category     = document.getElementById('edit-cat').value.trim() || '一般';
+async function saveEdit() {
+  const text = document.getElementById("edit-q-text").value.trim();
 
-  if (editingQid.startsWith('__new__')) {
-    const materialId = editingQid.replace('__new__','');
-    S.questions.push({ id:uid(), materialId, text, choices, correct, explanation, category, tags:['手動追加'] });
-    save(); closeEdit(); navigate('question-edit',{materialId});
-  } else {
-    const q = S.questions.find(x=>x.id===editingQid);
-    if (q) { Object.assign(q,{text,choices,correct,explanation,category}); save(); }
-    closeEdit(); navigate('question-edit',{materialId:q?.materialId});
+  if (!text) {
+    alert("問題文を入力してください");
+    return;
+  }
+
+  const choices = [0, 1, 2, 3].map(i => {
+    return document.getElementById(`edit-c${i}`).value.trim();
+  });
+
+  if (choices.some(choice => !choice)) {
+    alert("すべての選択肢を入力してください");
+    return;
+  }
+
+  const correctEl = document.querySelector('input[name="correct-choice"]:checked');
+  const correct = correctEl ? parseInt(correctEl.value, 10) : 0;
+  const explanation = document.getElementById("edit-explain").value.trim();
+  const category = document.getElementById("edit-cat").value.trim() || "一般";
+
+  const payload = {
+    text,
+    choices,
+    correct,
+    explanation,
+    category,
+    tags: editingQid.startsWith("__new__") ? ["手動追加"] : undefined
+  };
+
+  try {
+    let response;
+
+    if (editingQid.startsWith("__new__")) {
+      const materialId = editingQid.replace("__new__", "");
+
+      response = await fetch(`/api/materials/${encodeURIComponent(materialId)}/questions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        alert(data.message || "問題の追加に失敗しました");
+        return;
+      }
+
+      applyMaterialsPayload(data.payload || data);
+      save();
+      closeEdit();
+      navigate("question-edit", { materialId });
+      return;
+    }
+
+    const q = S.questions.find(item => item.id === editingQid);
+
+    if (!q) {
+      alert("編集する問題が見つかりません");
+      return;
+    }
+
+    response = await fetch(`/api/materials/${encodeURIComponent(q.materialId)}/questions/${encodeURIComponent(q.id)}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        ...payload,
+        tags: Array.isArray(q.tags) ? q.tags : []
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      alert(data.message || "問題の保存に失敗しました");
+      return;
+    }
+
+    applyMaterialsPayload(data.payload || data);
+    save();
+    closeEdit();
+    navigate("question-edit", { materialId: q.materialId });
+  } catch {
+    alert("通信エラーが発生しました");
   }
 }
 
