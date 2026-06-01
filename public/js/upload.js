@@ -225,5 +225,5 @@ function finishAnalysis(params, apiQuestions) {
   }
 
   save();
-  setTimeout(() => navigate('question-edit', { materialId }), 500);
+  setTimeout(() => navigate('materials', { materialId }), 500);
 }
