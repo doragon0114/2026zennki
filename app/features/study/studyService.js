@@ -1,23 +1,18 @@
 const crypto = require("crypto");
-
 const studyRepository = require("./studyRepository");
 
 function createId(prefix) {
   return `${prefix}_${crypto.randomBytes(6).toString("hex")}`;
 }
 
-function getBootstrapData() {
-  const data = studyRepository.getStudyData();
+async function getBootstrapData() {
+  const data = await studyRepository.getStudyData();
 
   const materials = data.materials.map(material => {
     const questionCount = data.questions.filter(question => {
       return question.materialId === material.id;
     }).length;
-
-    return {
-      ...material,
-      questionCount
-    };
+    return { ...material, questionCount };
   });
 
   const questions = data.questions.map(question => ({
@@ -28,22 +23,18 @@ function getBootstrapData() {
     text: question.text,
     choices: question.choices,
     correct: question.correct,
-    explanation: question.explanation || ""
+    explanation: question.explanation || "",
   }));
 
   const categories = [
     "すべて",
-    ...new Set(questions.map(question => question.category).filter(Boolean))
+    ...new Set(questions.map(q => q.category).filter(Boolean))
   ];
 
-  return {
-    materials,
-    questions,
-    categories
-  };
+  return { materials, questions, categories };
 }
 
-function saveResult({ userId, answers, questions, startedAt, finishedAt }) {
+async function saveResult({ userId, answers, questions, startedAt, finishedAt }) {
   const safeAnswers = Array.isArray(answers) ? answers : [];
   const safeQuestions = Array.isArray(questions) ? questions : [];
 
@@ -63,7 +54,7 @@ function saveResult({ userId, answers, questions, startedAt, finishedAt }) {
     questionIds: safeQuestions.map(question => question.id),
     startedAt: startedAt || null,
     finishedAt: finishedAt || new Date().toISOString(),
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
 
   return studyRepository.saveStudyResult(result);
@@ -71,5 +62,5 @@ function saveResult({ userId, answers, questions, startedAt, finishedAt }) {
 
 module.exports = {
   getBootstrapData,
-  saveResult
+  saveResult,
 };

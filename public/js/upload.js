@@ -216,10 +216,20 @@ function finishAnalysis(params, apiQuestions) {
 
   if (apiQuestions?.length > 0) {
     const newQs = apiQuestions.map((q, i) => ({
-      ...q,
       id: `${materialId}_${i}`,
       materialId,
       category: category || q.category || '一般',
+      tags: q.tags || [],
+      text: q.text,
+      // ★ choices が文字列で来た場合も配列に変換
+      choices: Array.isArray(q.choices)
+        ? q.choices
+        : typeof q.choices === 'string'
+          ? JSON.parse(q.choices)
+          : [],
+      correct: q.correct ?? 0,
+      explanation: q.explanation || '',
+      createdAt: new Date().toISOString(),
     }));
     S.questions.push(...newQs);
   }

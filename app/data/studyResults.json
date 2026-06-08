@@ -256,5 +256,32 @@
     "startedAt": "2026-05-29T07:28:51.661Z",
     "finishedAt": "2026-05-29T07:29:12.607Z",
     "createdAt": "2026-05-29T07:29:12.614Z"
+  },
+  {
+    "id": "study_result_55844eda14a3",
+    "userId": "user_f9c134d140",
+    "correct": 1,
+    "total": 2,
+    "pct": 50,
+    "pointsGained": 10,
+    "answers": [
+      {
+        "questionId": "q_math_002",
+        "chosen": 2,
+        "correct": true
+      },
+      {
+        "questionId": "q_math_001",
+        "chosen": 0,
+        "correct": false
+      }
+    ],
+    "questionIds": [
+      "q_math_002",
+      "q_math_001"
+    ],
+    "startedAt": "2026-06-01T06:26:10.447Z",
+    "finishedAt": "2026-06-01T06:26:25.505Z",
+    "createdAt": "2026-06-01T06:26:25.513Z"
   }
 ]

@@ -1,61 +1,81 @@
-const fs = require("fs");
-const path = require("path");
+const db = require("../DB/dbRoutes");
 
-const studyDataPath = path.join(__dirname, "../../data/studyData.json");
-const studyResultsPath = path.join(__dirname, "../../data/studyResults.json");
+async function buildStudyData() {
+  const lists = await db.getAllQuestionLists();
 
-// 後でDB化する場合は、このRepositoryの中身をMySQL処理に差し替える
-function readJson(filePath, fallback) {
-  if (!fs.existsSync(filePath)) {
-    return fallback;
-  }
+  const materials = await Promise.all(
+    lists.map(async (list) => {
+      const questions = await db.findQuestionsByListId(list.QLIST_ID);
+      return {
+        id: list.QLIST_ID,
+        name: `問題セット ${list.QLIST_ID}`,
+        category: list.CATEGORY_ID,
+        questionCount: questions.length,
+        shared: false,
+        type: "file",
+        createdAt: new Date().toISOString(),
+      };
+    })
+  );
 
-  try {
-    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
-  } catch {
-    return fallback;
-  }
+  const questionArrays = await Promise.all(
+    lists.map(async (list) => {
+      const qs = await db.findQuestionsByListId(list.QLIST_ID);
+      return qs.map((q) => ({
+        id: q.QID,
+        materialId: q.QLIST_ID,
+        text: q.QUESTION,
+        choices: [q.ANSWER, q.MISS_ONE, q.MISS_TWO, q.MISS_THREE],
+        correct: 0,
+        explanation: q.EXPLAIN || "",
+        category: list.CATEGORY_ID,
+        tags: [],
+      }));
+    })
+  );
+
+  return {
+    materials,
+    questions: questionArrays.flat(),
+  };
 }
 
-function writeJson(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+async function getStudyData() {
+  return buildStudyData();
 }
 
-function getStudyData() {
-  return readJson(studyDataPath, {
-    materials: [],
-    questions: []
-  });
+async function getMaterials() {
+  const data = await buildStudyData();
+  return data.materials;
 }
 
-function getMaterials() {
-  return getStudyData().materials;
+async function getQuestions() {
+  const data = await buildStudyData();
+  return data.questions;
 }
 
-function getQuestions() {
-  return getStudyData().questions;
+async function getQuestionById(questionId) {
+  const q = await db.findQuestionById(questionId);
+  if (!q) return null;
+  return {
+    id: q.QID,
+    materialId: q.QLIST_ID,
+    text: q.QUESTION,
+    choices: [q.ANSWER, q.MISS_ONE, q.MISS_TWO, q.MISS_THREE],
+    correct: 0,
+    explanation: q.EXPLAIN || "",
+    tags: [],
+  };
 }
 
-function getQuestionById(questionId) {
-  return getQuestions().find(question => question.id === questionId) || null;
+async function getQuestionsByIds(questionIds) {
+  const results = await Promise.all(questionIds.map(id => getQuestionById(id)));
+  return results.filter(Boolean);
 }
 
-function getQuestionsByIds(questionIds) {
-  const questions = getQuestions();
-
-  return questionIds
-    .map(id => questions.find(question => question.id === id))
-    .filter(Boolean);
-}
-
-function getStudyResults() {
-  return readJson(studyResultsPath, []);
-}
-
-function saveStudyResult(result) {
-  const results = getStudyResults();
-  results.push(result);
-  writeJson(studyResultsPath, results);
+async function saveStudyResult(result) {
+  // TODO: ANSWERLISTテーブルへの保存は後で実装
+  console.log("学習結果:", result);
   return result;
 }
 
@@ -65,6 +85,5 @@ module.exports = {
   getQuestions,
   getQuestionById,
   getQuestionsByIds,
-  getStudyResults,
-  saveStudyResult
+  saveStudyResult,
 };
