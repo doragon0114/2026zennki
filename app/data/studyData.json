@@ -1,14 +1,13 @@
 {
   "materials": [
     {
-      "id": "mat_basic_5subjects",
-      "name": "五教科 基礎問題集",
+      "id": "mat_jp_basic",
+      "name": "国語 基礎演習",
       "type": "mock",
-      "filename": "mock-basic-5subjects",
+      "filename": "mock-jp-basic",
       "createdAt": "2026-05-01T00:00:00.000Z",
-      "questionCount": 9,
-      "shared": true,
-      "updatedAt": "2026-05-29T07:28:11.864Z"
+      "questionCount": 5,
+      "shared": true
     },
     {
       "id": "mat_math_basic",
@@ -18,208 +17,289 @@
       "createdAt": "2026-05-01T00:00:00.000Z",
       "questionCount": 5,
       "shared": true
+    },
+    {
+      "id": "mat_en_basic",
+      "name": "英語 基礎演習",
+      "type": "mock",
+      "filename": "mock-en-basic",
+      "createdAt": "2026-05-01T00:00:00.000Z",
+      "questionCount": 5,
+      "shared": true
+    },
+    {
+      "id": "mat_sci_basic",
+      "name": "理科 基礎演習",
+      "type": "mock",
+      "filename": "mock-sci-basic",
+      "createdAt": "2026-05-01T00:00:00.000Z",
+      "questionCount": 5,
+      "shared": true
+    },
+    {
+      "id": "mat_soc_basic",
+      "name": "社会 基礎演習",
+      "type": "mock",
+      "filename": "mock-soc-basic",
+      "createdAt": "2026-05-01T00:00:00.000Z",
+      "questionCount": 5,
+      "shared": true
     }
   ],
   "questions": [
     {
-      "id": "q_jp_001",
-      "materialId": "mat_basic_5subjects",
+      "id": "q_jp_new_001",
+      "materialId": "mat_jp_basic",
       "category": "国語",
-      "tags": [
-        "漢字",
-        "基礎"
-      ],
-      "text": "「山」の音読みはどれですか？",
-      "choices": [
-        "やま",
-        "さん",
-        "かわ",
-        "りん"
-      ],
+      "tags": ["漢字", "読み"],
+      "text": "「川」の音読みはどれですか？",
+      "choices": ["かわ", "せん", "やま", "すい"],
       "correct": 1,
-      "explanation": "「山」の音読みは「さん」です。",
-      "updatedAt": "2026-05-29T07:22:59.124Z"
+      "explanation": "「川」の音読みは「せん」です。"
     },
     {
-      "id": "q_jp_002",
-      "materialId": "mat_basic_5subjects",
+      "id": "q_jp_new_002",
+      "materialId": "mat_jp_basic",
       "category": "国語",
-      "tags": [
-        "品詞",
-        "基礎"
-      ],
-      "text": "「走る」の品詞はどれですか？",
-      "choices": [
-        "名詞",
-        "動詞",
-        "形容詞",
-        "副詞"
-      ],
+      "tags": ["漢字", "書き"],
+      "text": "「そら」を漢字で書くとどれですか？",
+      "choices": ["海", "空", "山", "雨"],
       "correct": 1,
-      "explanation": "「走る」は動作を表すので動詞です。"
+      "explanation": "「そら」は漢字で「空」と書きます。"
     },
     {
-      "id": "q_math_001",
+      "id": "q_jp_new_003",
+      "materialId": "mat_jp_basic",
+      "category": "国語",
+      "tags": ["品詞", "基礎"],
+      "text": "「美しい」の品詞はどれですか？",
+      "choices": ["名詞", "動詞", "形容詞", "副詞"],
+      "correct": 2,
+      "explanation": "「美しい」はものの様子を表す形容詞です。"
+    },
+    {
+      "id": "q_jp_new_004",
+      "materialId": "mat_jp_basic",
+      "category": "国語",
+      "tags": ["ことわざ", "基礎"],
+      "text": "「石の上にも三年」の意味として正しいものはどれですか？",
+      "choices": ["すぐにあきらめること", "長くがまんして努力すること", "石を集めること", "三年間遊ぶこと"],
+      "correct": 1,
+      "explanation": "「石の上にも三年」は、つらくても長くがまんして努力すれば成果が出るという意味です。"
+    },
+    {
+      "id": "q_jp_new_005",
+      "materialId": "mat_jp_basic",
+      "category": "国語",
+      "tags": ["反対語", "基礎"],
+      "text": "「大きい」の反対語はどれですか？",
+      "choices": ["高い", "小さい", "長い", "広い"],
+      "correct": 1,
+      "explanation": "「大きい」の反対語は「小さい」です。"
+    },
+
+    {
+      "id": "q_math_new_001",
       "materialId": "mat_math_basic",
       "category": "数学",
-      "tags": [
-        "計算",
-        "九九"
-      ],
-      "text": "7 × 8 はいくつですか？",
-      "choices": [
-        "54",
-        "56",
-        "58",
-        "64"
-      ],
-      "correct": 1,
-      "explanation": "7 × 8 = 56 です。"
+      "tags": ["計算", "足し算"],
+      "text": "23 + 17 はいくつですか？",
+      "choices": ["30", "35", "40", "45"],
+      "correct": 2,
+      "explanation": "23 + 17 = 40 です。"
     },
     {
-      "id": "q_math_002",
+      "id": "q_math_new_002",
       "materialId": "mat_math_basic",
       "category": "数学",
-      "tags": [
-        "図形",
-        "基礎"
-      ],
-      "text": "三角形の内角の和は何度ですか？",
-      "choices": [
-        "90度",
-        "120度",
-        "180度",
-        "360度"
-      ],
-      "correct": 2,
-      "explanation": "三角形の内角の和は180度です。"
-    },
-    {
-      "id": "q_en_001",
-      "materialId": "mat_basic_5subjects",
-      "category": "英語",
-      "tags": [
-        "単語",
-        "基礎"
-      ],
-      "text": "「りんご」を英語で表すとどれですか？",
-      "choices": [
-        "apple",
-        "orange",
-        "banana",
-        "grape"
-      ],
-      "correct": 0,
-      "explanation": "「りんご」は英語で apple です。"
-    },
-    {
-      "id": "q_en_002",
-      "materialId": "mat_basic_5subjects",
-      "category": "英語",
-      "tags": [
-        "単語",
-        "動詞"
-      ],
-      "text": "「走る」を英語で表すとどれですか？",
-      "choices": [
-        "walk",
-        "run",
-        "read",
-        "sleep"
-      ],
+      "tags": ["計算", "引き算"],
+      "text": "50 - 18 はいくつですか？",
+      "choices": ["28", "32", "34", "38"],
       "correct": 1,
-      "explanation": "「走る」は英語で run です。"
+      "explanation": "50 - 18 = 32 です。"
     },
     {
-      "id": "q_sci_001",
-      "materialId": "mat_basic_5subjects",
-      "category": "理科",
-      "tags": [
-        "物質",
-        "状態変化"
-      ],
-      "text": "水が氷になることを何といいますか？",
-      "choices": [
-        "蒸発",
-        "凝固",
-        "融解",
-        "沸騰"
-      ],
-      "correct": 1,
-      "explanation": "液体が固体になることを凝固といいます。"
-    },
-    {
-      "id": "q_sci_002",
-      "materialId": "mat_basic_5subjects",
-      "category": "理科",
-      "tags": [
-        "植物",
-        "光合成"
-      ],
-      "text": "植物が光を使って養分を作るはたらきはどれですか？",
-      "choices": [
-        "呼吸",
-        "光合成",
-        "蒸発",
-        "分解"
-      ],
-      "correct": 1,
-      "explanation": "植物が光を使って養分を作るはたらきは光合成です。"
-    },
-    {
-      "id": "q_soc_001",
-      "materialId": "mat_basic_5subjects",
-      "category": "社会",
-      "tags": [
-        "地理",
-        "日本"
-      ],
-      "text": "日本の首都はどこですか？",
-      "choices": [
-        "大阪",
-        "京都",
-        "東京",
-        "札幌"
-      ],
-      "correct": 2,
-      "explanation": "日本の首都は東京です。"
-    },
-    {
-      "id": "q_soc_002",
-      "materialId": "mat_basic_5subjects",
-      "category": "社会",
-      "tags": [
-        "地理",
-        "日本"
-      ],
-      "text": "日本で一番高い山はどれですか？",
-      "choices": [
-        "富士山",
-        "阿蘇山",
-        "筑波山",
-        "高尾山"
-      ],
-      "correct": 0,
-      "explanation": "日本で一番高い山は富士山です。"
-    },
-    {
-      "id": "q_32680a1b68ed",
-      "materialId": "mat_basic_5subjects",
-      "text": "1+2+3+4+5+6+7+8+9+10はなに?",
-      "choices": [
-        "45",
-        "55",
-        "65",
-        "70"
-      ],
-      "correct": 1,
-      "explanation": "5以外はうまいこと足していけば10になるから残りの5と10達を足していこう",
+      "id": "q_math_new_003",
+      "materialId": "mat_math_basic",
       "category": "数学",
-      "tags": [
-        "手動追加"
-      ],
-      "createdAt": "2026-05-29T07:28:11.861Z",
-      "updatedAt": "2026-05-29T07:28:11.861Z"
+      "tags": ["計算", "かけ算"],
+      "text": "9 × 6 はいくつですか？",
+      "choices": ["45", "54", "56", "63"],
+      "correct": 1,
+      "explanation": "9 × 6 = 54 です。"
+    },
+    {
+      "id": "q_math_new_004",
+      "materialId": "mat_math_basic",
+      "category": "数学",
+      "tags": ["図形", "基礎"],
+      "text": "正方形の4つの角はすべて何度ですか？",
+      "choices": ["45度", "60度", "90度", "180度"],
+      "correct": 2,
+      "explanation": "正方形の4つの角はすべて90度です。"
+    },
+    {
+      "id": "q_math_new_005",
+      "materialId": "mat_math_basic",
+      "category": "数学",
+      "tags": ["分数", "基礎"],
+      "text": "1/2 と同じ大きさの分数はどれですか？",
+      "choices": ["1/3", "2/4", "3/5", "4/6"],
+      "correct": 1,
+      "explanation": "1/2 は、分子と分母を2倍すると 2/4 になります。"
+    },
+
+    {
+      "id": "q_en_new_001",
+      "materialId": "mat_en_basic",
+      "category": "英語",
+      "tags": ["単語", "基礎"],
+      "text": "「犬」を英語で表すとどれですか？",
+      "choices": ["cat", "dog", "bird", "fish"],
+      "correct": 1,
+      "explanation": "「犬」は英語で dog です。"
+    },
+    {
+      "id": "q_en_new_002",
+      "materialId": "mat_en_basic",
+      "category": "英語",
+      "tags": ["単語", "色"],
+      "text": "「赤」を英語で表すとどれですか？",
+      "choices": ["blue", "green", "red", "yellow"],
+      "correct": 2,
+      "explanation": "「赤」は英語で red です。"
+    },
+    {
+      "id": "q_en_new_003",
+      "materialId": "mat_en_basic",
+      "category": "英語",
+      "tags": ["文法", "be動詞"],
+      "text": "「I ___ a student.」に入る正しい語はどれですか？",
+      "choices": ["am", "is", "are", "be"],
+      "correct": 0,
+      "explanation": "主語が I のとき、be動詞は am を使います。"
+    },
+    {
+      "id": "q_en_new_004",
+      "materialId": "mat_en_basic",
+      "category": "英語",
+      "tags": ["単語", "曜日"],
+      "text": "「月曜日」を英語で表すとどれですか？",
+      "choices": ["Sunday", "Monday", "Friday", "Saturday"],
+      "correct": 1,
+      "explanation": "「月曜日」は英語で Monday です。"
+    },
+    {
+      "id": "q_en_new_005",
+      "materialId": "mat_en_basic",
+      "category": "英語",
+      "tags": ["文法", "疑問文"],
+      "text": "「あなたは元気ですか？」を英語で表すとどれですか？",
+      "choices": ["How are you?", "What is this?", "I am fine.", "See you."],
+      "correct": 0,
+      "explanation": "「あなたは元気ですか？」は How are you? と表します。"
+    },
+
+    {
+      "id": "q_sci_new_001",
+      "materialId": "mat_sci_basic",
+      "category": "理科",
+      "tags": ["生物", "植物"],
+      "text": "植物が光合成をするときに必要なものはどれですか？",
+      "choices": ["光", "砂", "鉄", "氷"],
+      "correct": 0,
+      "explanation": "植物は光を使って光合成を行います。"
+    },
+    {
+      "id": "q_sci_new_002",
+      "materialId": "mat_sci_basic",
+      "category": "理科",
+      "tags": ["天気", "基礎"],
+      "text": "空気中の水蒸気が冷えて水の粒になったものはどれですか？",
+      "choices": ["雲", "火山", "地震", "岩石"],
+      "correct": 0,
+      "explanation": "空気中の水蒸気が冷えて小さな水の粒になると雲ができます。"
+    },
+    {
+      "id": "q_sci_new_003",
+      "materialId": "mat_sci_basic",
+      "category": "理科",
+      "tags": ["物質", "状態変化"],
+      "text": "氷が水になることを何といいますか？",
+      "choices": ["凝固", "融解", "蒸発", "沸騰"],
+      "correct": 1,
+      "explanation": "固体が液体になることを融解といいます。"
+    },
+    {
+      "id": "q_sci_new_004",
+      "materialId": "mat_sci_basic",
+      "category": "理科",
+      "tags": ["人体", "基礎"],
+      "text": "人間が呼吸で取り入れる気体は主にどれですか？",
+      "choices": ["酸素", "二酸化炭素", "水素", "窒素"],
+      "correct": 0,
+      "explanation": "人間は呼吸で酸素を取り入れます。"
+    },
+    {
+      "id": "q_sci_new_005",
+      "materialId": "mat_sci_basic",
+      "category": "理科",
+      "tags": ["電気", "基礎"],
+      "text": "電気を通しやすいものはどれですか？",
+      "choices": ["木", "プラスチック", "ゴム", "銅"],
+      "correct": 3,
+      "explanation": "銅などの金属は電気を通しやすい性質があります。"
+    },
+
+    {
+      "id": "q_soc_new_001",
+      "materialId": "mat_soc_basic",
+      "category": "社会",
+      "tags": ["地理", "日本"],
+      "text": "日本の国旗に描かれている丸の色は何色ですか？",
+      "choices": ["青", "赤", "緑", "黒"],
+      "correct": 1,
+      "explanation": "日本の国旗には赤い丸が描かれています。"
+    },
+    {
+      "id": "q_soc_new_002",
+      "materialId": "mat_soc_basic",
+      "category": "社会",
+      "tags": ["地理", "都道府県"],
+      "text": "北海道の道庁所在地はどこですか？",
+      "choices": ["札幌市", "函館市", "旭川市", "釧路市"],
+      "correct": 0,
+      "explanation": "北海道の道庁所在地は札幌市です。"
+    },
+    {
+      "id": "q_soc_new_003",
+      "materialId": "mat_soc_basic",
+      "category": "社会",
+      "tags": ["歴史", "基礎"],
+      "text": "江戸幕府を開いた人物は誰ですか？",
+      "choices": ["織田信長", "豊臣秀吉", "徳川家康", "源頼朝"],
+      "correct": 2,
+      "explanation": "江戸幕府を開いたのは徳川家康です。"
+    },
+    {
+      "id": "q_soc_new_004",
+      "materialId": "mat_soc_basic",
+      "category": "社会",
+      "tags": ["公民", "基礎"],
+      "text": "日本の法律を作る機関はどれですか？",
+      "choices": ["国会", "裁判所", "市役所", "警察署"],
+      "correct": 0,
+      "explanation": "日本で法律を作る機関は国会です。"
+    },
+    {
+      "id": "q_soc_new_005",
+      "materialId": "mat_soc_basic",
+      "category": "社会",
+      "tags": ["地理", "世界"],
+      "text": "世界で最も面積が広い国はどれですか？",
+      "choices": ["日本", "アメリカ", "ロシア", "イギリス"],
+      "correct": 2,
+      "explanation": "世界で最も面積が広い国はロシアです。"
     }
   ]
 }
