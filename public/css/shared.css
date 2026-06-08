@@ -1,0 +1,556 @@
+/* ============================================================
+   css/shared.css — 共通 UI（js/shared.js 担当）
+   CSS変数・リセット・ボトムナビ・アニメーション・ヘッダー・ボタン・
+   フォーム・セットカード・タグ・ユーティリティなど全画面共通スタイル
+============================================================ */
+
+/* ============================================================
+   CSS変数（カラーパレット・影・角丸の一元管理）
+   ここの値を変えるだけでアプリ全体のデザインを変更できる
+============================================================ */
+:root {
+  /* メインカラー：Revino のブランドカラー（青系） */
+  --primary:        #3B82F6;
+  --primary-dark:   #2563EB;
+  --primary-darker: #1D4ED8;
+  --primary-soft:   #DBEAFE;
+  --primary-tint:   #EFF4FF;
+
+  /* 背景色 */
+  --bg:             #F5F8FF;
+  --bg-grad-1:      #EEF4FF;
+  --bg-grad-2:      #F8FBFF;
+  --surface:        #FFFFFF;
+  --surface-alt:    #F8FAFF;
+
+  /* テキストカラー（濃さが違う4段階） */
+  --text:           #0F172A;
+  --text-2:         #334155;
+  --text-3:         #64748B;
+  --text-muted:     #94A3B8;
+
+  /* 線・ボーダー */
+  --border:         #E5ECF7;
+  --border-soft:    #F1F5FB;
+  --divider:        #EEF2F8;
+
+  /* アクセントカラー（タグ・アイコンの色分けに使用） */
+  --green:          #16A34A;
+  --green-bg:       #DCFCE7;
+  --gold:           #F59E0B;
+  --gold-bg:        #FEF3C7;
+  --red:            #DC2626;
+  --red-bg:         #FEE2E2;
+  --purple:         #8B5CF6;
+  --purple-bg:      #EDE9FE;
+  --teal:           #0D9488;
+  --teal-bg:        #CCFBF1;
+
+  /* 影（小さいものから大きいものまで用途に合わせて使い分ける） */
+  --shadow-xs:      0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm:      0 2px 10px rgba(59, 130, 246, 0.06);
+  --shadow-md:      0 6px 24px rgba(59, 130, 246, 0.09);
+  --shadow-lg:      0 12px 40px rgba(59, 130, 246, 0.14);
+  --shadow-btn:     0 8px 22px rgba(59, 130, 246, 0.32);
+  --shadow-card:    0 4px 20px rgba(30, 70, 160, 0.07);
+
+  /* 角丸（--r-pill は完全な丸型ボタンに使用） */
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 20px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  /* 後方互換用エイリアス：app.js のインラインスタイルが参照している古い変数名 */
+  --gray: var(--text-3);
+  --dark: var(--text);
+  --blue-dark: var(--primary-darker);
+  --shadow-gold: 0 4px 14px rgba(245, 158, 11, 0.32);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  font-family: 'Plus Jakarta Sans', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'palt' 1;
+}
+
+body {
+  background:
+    radial-gradient(1200px 800px at 50% -10%, #DDE9FF 0%, transparent 60%),
+    linear-gradient(180deg, #E7EFFB 0%, #F2F6FF 50%, #E9F0FC 100%);
+  background-attachment: fixed;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+#app {
+  width: 100%;
+  max-width: 480px;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #F2F6FF 0%, #F8FBFF 50%, #FFFFFF 100%);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 30px 80px rgba(20, 50, 120, 0.18);
+  overflow: hidden;
+}
+
+#screen {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 108px;
+  scrollbar-width: none;
+}
+#screen::-webkit-scrollbar { display: none; }
+
+/* ====== ボトムナビゲーション ======
+   画面下部に固定表示されるナビバー。
+   フローティング pill 型デザイン（浮いているように見える角丸バー）。
+   中央の雷ボタンだけ上に飛び出してアップロードへ誘導する。 */
+.bottom-nav {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 456px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  height: 72px;
+  z-index: 200;
+  box-shadow: 0 12px 36px rgba(30, 80, 180, 0.14), 0 2px 8px rgba(30, 80, 180, 0.06);
+  padding: 0 6px;
+}
+.bottom-nav.hidden { display: none; }
+
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  gap: 4px;
+  padding: 8px 2px;
+  color: var(--text-muted);
+  transition: color 0.15s;
+}
+.nav-btn svg { width: 22px; height: 22px; stroke-width: 2; transition: transform 0.15s; }
+.nav-icon { font-size: 21px; line-height: 1; }
+.nav-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.2px; }
+.nav-btn.active { color: var(--primary-dark); }
+.nav-btn.active .nav-label { color: var(--primary-dark); font-weight: 800; }
+.nav-btn.active svg { transform: scale(1.08); }
+
+.nav-center-btn { flex: 0 0 64px; margin: 0 4px; padding: 0; }
+.nav-center-icon {
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(140deg, #60A5FA 0%, var(--primary) 50%, var(--primary-darker) 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  box-shadow: 0 10px 26px rgba(59, 130, 246, 0.45), 0 2px 6px rgba(59, 130, 246, 0.2);
+  margin-top: -22px;
+  border: 4px solid white;
+  transition: transform 0.15s;
+}
+.nav-center-icon svg { width: 24px; height: 24px; color: white; stroke-width: 2.4; }
+.nav-center-btn:active .nav-center-icon { transform: scale(0.94); }
+
+/* ====== アニメーション定義 ======
+   @keyframes で動きを定義し、各要素から animation プロパティで呼び出す */
+@keyframes fadeInUp  { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+@keyframes float     { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+@keyframes loadBar   { from{width:0} to{width:100%} }
+@keyframes spin      { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes pulse     { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.06);opacity:0.85} }
+@keyframes blink     { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
+@keyframes bounceIn  { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.1)} 80%{transform:scale(0.95)} 100%{transform:scale(1);opacity:1} }
+@keyframes shimmer   { from{background-position:-200px 0} to{background-position:calc(200px + 100%) 0} }
+@keyframes twinkle   { 0%,100%{opacity:0.2;transform:scale(0.8)} 50%{opacity:1;transform:scale(1.1)} }
+@keyframes wave      { 0%,100%{transform:rotate(0deg)} 25%{transform:rotate(20deg)} 75%{transform:rotate(-12deg)} }
+@keyframes shake     { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-5px)} 40%{transform:translateX(5px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+@keyframes dotPop    { 0%{transform:scale(1)} 45%{transform:scale(1.7)} 100%{transform:scale(1)} }
+@keyframes vsIntroIn { 0%{opacity:0;transform:scale(0.88)} 20%{opacity:1;transform:scale(1)} 75%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(1.04)} }
+
+.fade-in { animation: fadeInUp 0.28s cubic-bezier(.2,.7,.3,1); }
+
+/* ====== 画面ヘッダー ======
+   各サブ画面の上部に固定表示されるヘッダー。
+   戻るボタン・タイトル・アクションボタンの3カラム構成。
+   .white-bg / .blue-bg / .dark-bg / .red-bg で背景色を切り替える。 */
+.screen-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px 12px;
+  background: transparent;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.screen-header.white-bg { background: rgba(255,255,255,0.85); border-bottom: 1px solid var(--border-soft); }
+.screen-header.blue-bg  { background: rgba(239, 244, 255, 0.85); }
+.screen-header.dark-bg  { background: rgba(15, 23, 42, 0.92); color: white; }
+.screen-header.red-bg   { background: linear-gradient(180deg, rgba(220,38,38,0.95), rgba(220,38,38,0)); color: white; border-bottom: none; }
+
+.back-btn {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  flex-shrink: 0;
+  transition: transform 0.15s, background 0.15s;
+  color: var(--text);
+}
+.back-btn::before {
+  content: '';
+  display: block;
+  width: 9px; height: 9px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-left: 4px;
+}
+.back-btn:active { transform: scale(0.92); }
+.screen-header.dark-bg .back-btn { background: rgba(255,255,255,0.12); border-color: transparent; color: white; }
+
+.header-title {
+  font-size: 17px;
+  font-weight: 800;
+  flex: 1;
+  color: var(--text);
+  text-align: center;
+  letter-spacing: -0.2px;
+}
+.screen-header.dark-bg .header-title { color: white; }
+
+.header-action {
+  background: var(--primary);
+  border: none;
+  padding: 9px 16px;
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.28);
+  transition: transform 0.15s;
+}
+.header-action:active { transform: scale(0.96); }
+
+/* ====== ボタン ======
+   .btn が共通の基底クラス。
+   .btn-primary（青）/ .btn-gold（金）/ .btn-danger（赤）/ .btn-outline（枠線）など
+   modifier クラスを組み合わせて使う。
+   .btn-sm / .btn-xs でサイズを小さくできる。 */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 17px 22px;
+  border: none;
+  border-radius: var(--r-pill);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.2s;
+  font-family: inherit;
+  text-align: center;
+  text-decoration: none;
+  letter-spacing: -0.1px;
+  position: relative;
+}
+.btn:active { transform: scale(0.98); }
+
+.btn-primary {
+  background: linear-gradient(135deg, #60A5FA 0%, var(--primary) 50%, var(--primary-dark) 100%);
+  color: white;
+  box-shadow: var(--shadow-btn);
+}
+.btn-primary:hover { box-shadow: 0 10px 28px rgba(59, 130, 246, 0.42); }
+
+.btn-primary span.arrow-fab {
+  position: absolute;
+  right: 8px; top: 50%;
+  transform: translateY(-50%);
+  width: 34px; height: 34px;
+  background: rgba(255,255,255,0.22);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  pointer-events: none;
+}
+.btn-primary span.arrow-fab svg { width: 14px; height: 14px; }
+
+.btn-gold {
+  background: linear-gradient(135deg, #FBBF24, var(--gold));
+  color: white;
+  box-shadow: 0 8px 22px rgba(245, 158, 11, 0.32);
+}
+.btn-danger {
+  background: linear-gradient(135deg, #F87171, var(--red));
+  color: white;
+  box-shadow: 0 8px 22px rgba(220, 38, 38, 0.32);
+}
+.btn-outline {
+  background: var(--surface);
+  border: 1.5px solid var(--primary);
+  color: var(--primary-dark);
+  box-shadow: var(--shadow-xs);
+}
+.btn-outline-gray {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  color: var(--text-2);
+  box-shadow: var(--shadow-xs);
+}
+.btn-ghost {
+  background: rgba(255,255,255,0.5);
+  border: 1px solid var(--border);
+  color: var(--text-3);
+}
+.btn-sm { padding: 11px 20px; font-size: 13px; width: auto; display: inline-flex; }
+.btn-sm.btn-primary::after, .btn-sm.btn-primary span.arrow-fab { display: none; }
+.btn-xs { padding: 7px 14px; font-size: 12px; width: auto; display: inline-flex; gap: 4px; border-radius: var(--r-pill); }
+.btn-xs.btn-primary::after, .btn-xs.btn-primary span.arrow-fab { display: none; }
+
+/* ====== フォーム（入力欄・ラベル・エラーメッセージ） ====== */
+.form-group { margin-bottom: 18px; }
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  margin-bottom: 8px;
+  letter-spacing: -0.1px;
+}
+.form-input {
+  width: 100%;
+  padding: 15px 18px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s;
+  background: var(--surface);
+  color: var(--text);
+}
+.form-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+.form-input::placeholder { color: var(--text-muted); }
+
+.alert {
+  padding: 12px 16px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+.alert.hidden { display: none; }
+.alert-error   { background: var(--red-bg); color: #B91C1C; }
+.alert-success { background: var(--green-bg); color: #15803D; }
+.alert-info    { background: var(--primary-soft); color: var(--primary-darker); }
+
+/* ====== セット（教材）カード ======
+   ホーム画面・セット一覧画面で使うコンパクトなカードスタイル */
+.mini-set-card {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.mini-set-card:active { transform: scale(0.99); }
+.mini-set-card:hover { box-shadow: var(--shadow-md); }
+.mini-set-icon {
+  width: 42px; height: 42px;
+  border-radius: 12px;
+  background: var(--green-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.mini-set-icon.color-0 { background: var(--green-bg);  color: var(--green);   }
+.mini-set-icon.color-1 { background: var(--primary-soft); color: var(--primary);}
+.mini-set-icon.color-2 { background: var(--gold-bg);   color: var(--gold);    }
+.mini-set-icon.color-3 { background: var(--purple-bg); color: var(--purple);  }
+.mini-set-icon.color-4 { background: var(--red-bg);    color: var(--red);     }
+.mini-set-icon.color-5 { background: var(--teal-bg);   color: var(--teal);    }
+.mini-set-info { flex: 1; min-width: 0; }
+.mini-set-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.2px;
+}
+.mini-set-meta { font-size: 11.5px; color: var(--text-3); font-weight: 500; }
+.mini-set-bar-bg { height: 4px; background: var(--primary-tint); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+.mini-set-bar-fill { height: 100%; background: linear-gradient(90deg, #60A5FA, var(--primary)); border-radius: 2px; }
+.mini-set-pct {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--primary);
+  flex-shrink: 0;
+  letter-spacing: -0.3px;
+}
+.mini-set-pct.warn { color: var(--gold); }
+.mini-set-pct.danger { color: var(--red); }
+.mini-set-arrow {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.mini-set-arrow svg { width: 16px; height: 16px; stroke-width: 2.5; }
+
+/* ====== タグ（カテゴリラベル・バッジ） ======
+   .tag-blue / .tag-green / .tag-gray などの色バリエーションあり */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 700;
+  margin-right: 4px;
+  margin-bottom: 3px;
+  letter-spacing: -0.1px;
+  white-space: nowrap;
+}
+.tag-blue   { background: var(--primary-soft); color: var(--primary-darker); }
+.tag-green  { background: var(--green-bg); color: #15803D; }
+.tag-gold   { background: var(--gold-bg); color: #B45309; }
+.tag-coral  { background: var(--red-bg); color: #B91C1C; }
+.tag-purple { background: var(--purple-bg); color: #6D28D9; }
+.tag-gray   { background: var(--border-soft); color: var(--text-3); }
+.tag-sky    { background: var(--primary-soft); color: var(--primary-darker); }
+
+/* ====== CARDS ====== */
+.card {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-soft);
+}
+.card-row { display: flex; align-items: center; gap: 14px; }
+
+/* ====== ユーティリティクラス ======
+   どの画面でも使える汎用的なヘルパークラス（余白・テキスト位置・フレックスなど） */
+.screen-body { padding: 4px 20px 20px; }
+.mt8 { margin-top: 8px; }
+.mt12 { margin-top: 12px; }
+.mt16 { margin-top: 16px; }
+.mb8 { margin-bottom: 8px; }
+.mb12 { margin-bottom: 12px; }
+.mb16 { margin-bottom: 16px; }
+.text-center { text-align: center; }
+.text-gray { color: var(--text-3); font-size: 13px; }
+.fw700 { font-weight: 700; }
+.fw900 { font-weight: 800; }
+.hidden { display: none !important; }
+.flex-row { display: flex; gap: 10px; }
+.flex-row .btn { flex: 1; }
+
+/* ====== 対戦開始画面 ======
+   アバターサークル（絵文字の代わりに使うSVGアイコン入り丸タイル）
+============================================================ */
+.avatar-circle {
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   空状態アイコン（コンテンツが0件のときに表示するSVGアイコン）
+============================================================ */
+.empty-icon-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+  color: var(--text-3);
+  opacity: 0.6;
+}
+
+/* ============================================================
+   ストリークバッジ（問題画面の連続正解カウンター）
+============================================================ */
+.streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--primary-dark);
+  min-width: 36px;
+  justify-content: flex-end;
+}
+.streak-badge svg { color: #F97316; }
+
+/* ============================================================
+   セクション見出し（アイコン付きのセクションタイトル）
+============================================================ */
+.section-heading-icon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+/* ============================================================
+   フォームラベル内アイコン（入力フィールドのラベル左のSVGアイコン）
+============================================================ */
+.form-label svg {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 4px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}

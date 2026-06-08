@@ -311,6 +311,10 @@ function afterRender(screen, params) {
     }, 2000);
   }
 
+  if (screen === "home" && typeof loadHomeCalendarFromServer === "function") {
+    loadHomeCalendarFromServer();
+  }
+
   if (screen === 'analyzing') {
     runAIAnalysis(params);
   }

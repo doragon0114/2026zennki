@@ -1,0 +1,427 @@
+/* ============================================================
+   css/battle.css — 対戦系全画面（js/battle.js 担当）
+============================================================ */
+
+/* ====== 対戦画面（マッチング・対戦中・結果） ======
+   対戦中は赤オレンジ系のグラデーション背景で緊張感を演出する */
+/* === マッチング画面 === */
+.matching-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  padding: 24px;
+  gap: 28px;
+  text-align: center;
+}
+.matching-vs-row { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.matching-player-card { display: flex; flex-direction: column; align-items: center; gap: 9px; }
+.matching-player-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.matching-vs-badge {
+  font-size: 22px; font-weight: 900; color: var(--primary);
+  font-family: 'Plus Jakarta Sans', sans-serif; padding: 0 6px;
+}
+.matching-opp-placeholder {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--surface-2);
+  border: 2.5px dashed var(--border);
+  display: flex; align-items: center; justify-content: center;
+  animation: spin 1.8s linear infinite;
+  color: var(--text-3);
+}
+.matching-status-text { font-size: 15px; font-weight: 700; color: var(--text-2); }
+.thinking-dots { display: inline-flex; gap: 1px; margin-left: 1px; }
+.thinking-dots span { animation: blink 1.4s infinite; }
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+/* === 対戦画面 === */
+.battle-vs-intro {
+  position: fixed; inset: 0; z-index: 200;
+  background: white;
+  display: flex; align-items: center; justify-content: center; gap: 20px;
+  animation: vsIntroIn 1.6s ease forwards;
+  pointer-events: none;
+}
+.bvi-side { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.bvi-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.bvi-vs {
+  font-size: 40px; font-weight: 900; color: var(--primary);
+  font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -2px;
+}
+
+.battle-screen { background: var(--bg); min-height: 100vh; display: flex; flex-direction: column; }
+
+.battle-status-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-soft);
+  padding: 12px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.battle-q-label {
+  font-size: 18px; font-weight: 800; color: var(--text);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.bql-total { font-size: 13px; color: var(--text-3); font-weight: 600; }
+.battle-in-progress {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+  color: var(--primary); background: var(--primary-tint);
+  border-radius: var(--r-pill); padding: 4px 11px;
+}
+.battle-timer-pill {
+  font-size: 18px; font-weight: 800;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: var(--text); min-width: 32px; text-align: center;
+  transition: color 0.3s;
+}
+.battle-timer-pill.timer-urgent { color: var(--red); }
+
+.battle-scores-section {
+  background: var(--surface);
+  padding: 14px 18px 12px;
+  display: flex; align-items: flex-start;
+  border-bottom: 1px solid var(--border-soft);
+}
+.battle-score-bloc { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.bsb-top { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bsb-name { font-size: 11px; font-weight: 700; color: var(--text-3); }
+.bsb-num {
+  font-size: 30px; font-weight: 800; color: var(--primary);
+  font-family: 'Plus Jakarta Sans', sans-serif; line-height: 1;
+}
+.bsb-num.opp { color: var(--red); }
+.bsb-dots { display: flex; gap: 6px; }
+.bsb-vs {
+  display: flex; align-items: center;
+  font-size: 11px; font-weight: 800; color: var(--text-3);
+  padding: 0 8px; padding-top: 26px;
+}
+
+/* 進行ドット */
+.pdot {
+  width: 10px; height: 10px; border-radius: 50%;
+  transition: background 0.2s, border-color 0.2s;
+  box-sizing: border-box;
+}
+.pdot-empty   { background: var(--border); }
+.pdot-current { background: transparent; border: 2.5px solid var(--primary); }
+.pdot-opp-current { background: transparent; border: 2.5px solid var(--text-3); }
+.pdot-correct { background: var(--green); }
+.pdot-wrong   { background: var(--red); }
+.pdot-pop     { animation: dotPop 0.35s ease; }
+
+/* 問題カード */
+.battle-q-card {
+  margin: 14px 16px 0;
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 18px 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  border: 1px solid var(--border-soft);
+}
+.battle-q-text {
+  font-size: 15px; font-weight: 700; color: var(--text);
+  line-height: 1.55; margin-bottom: 14px;
+}
+.battle-choices-grid { display: flex; flex-direction: column; gap: 9px; }
+.bchoice-btn {
+  display: flex; align-items: center; gap: 11px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 12px 13px;
+  cursor: pointer; text-align: left; font-size: 14px; width: 100%;
+  transition: transform 0.15s ease, border-color 0.18s, background 0.18s, box-shadow 0.15s;
+}
+.bchoice-btn:hover:not(.disabled) {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(59,130,246,0.12);
+}
+.bchoice-btn.disabled { cursor: default; pointer-events: none; }
+.bchoice-btn.correct  { border-color: var(--green); background: #F0FDF4; }
+.bchoice-btn.wrong    { border-color: var(--red); background: #FEF2F2; animation: shake 0.4s ease; }
+.bchoice-lbl {
+  width: 26px; height: 26px; border-radius: 8px;
+  background: var(--primary-soft); color: var(--primary-darker);
+  font-size: 11px; font-weight: 800; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.bchoice-btn.correct .bchoice-lbl { background: #DCFCE7; color: #15803D; }
+.bchoice-btn.wrong   .bchoice-lbl { background: #FEE2E2; color: #B91C1C; }
+.bchoice-text { color: var(--text); font-weight: 500; line-height: 1.4; }
+
+/* インラインフィードバック */
+.battle-inline-feedback {
+  display: none; margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+}
+.battle-inline-feedback.show { display: block; }
+.bif-result { font-size: 15px; font-weight: 800; margin-bottom: 5px; }
+.bif-result.correct { color: var(--green); }
+.bif-result.wrong   { color: var(--red); }
+.bif-explain { font-size: 13px; color: var(--text-2); line-height: 1.55; margin-bottom: 12px; white-space: pre-line; }
+.bif-next-btn { width: 100%; }
+
+/* 相手ステータスバー */
+.battle-opp-status {
+  margin: 12px 16px 16px;
+  background: var(--surface);
+  border-radius: 12px; padding: 10px 14px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; font-weight: 600; color: var(--text-2);
+  border: 1px solid var(--border-soft);
+}
+.opp-thinking-text { color: var(--gold); }
+
+/* === 対戦結果画面 === */
+.battle-result-screen { background: var(--bg); }
+.br-hero {
+  padding: 32px 22px 26px; text-align: center; color: white;
+  border-radius: 0 0 28px 28px;
+}
+.br-hero.win  { background: linear-gradient(150deg, #2563EB, #1D4ED8); }
+.br-hero.lose { background: linear-gradient(150deg, #DC2626, #991B1B); }
+.br-hero.draw { background: linear-gradient(150deg, #475569, #334155); }
+.br-hero-label { font-size: 12px; opacity: 0.8; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
+.br-outcome-text {
+  font-size: 54px; font-weight: 900; line-height: 1; margin-bottom: 4px;
+  font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -2px;
+  animation: bounceIn 0.5s ease;
+}
+.br-pts {
+  font-size: 17px; font-weight: 700; opacity: 0.95; margin-bottom: 20px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.br-score-compare {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  background: rgba(255,255,255,0.13); border-radius: 16px; padding: 14px 18px;
+}
+.br-score-side { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.br-score-name { font-size: 11px; opacity: 0.88; font-weight: 700; }
+.br-score-num {
+  font-size: 38px; font-weight: 900; line-height: 1; letter-spacing: -1px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.br-score-num.mine   { color: #BAE6FD; }
+.br-score-num.theirs { color: #FCA5A5; }
+.br-score-vs { font-size: 12px; font-weight: 800; opacity: 0.65; }
+
+.battle-review-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.battle-review-table th {
+  padding: 12px 10px;
+  background: var(--primary-tint);
+  font-size: 12px;
+  color: var(--text-2);
+  font-weight: 700;
+}
+.battle-review-table td { padding: 12px 10px; border-bottom: 1px solid var(--border-soft); }
+.battle-review-table td:first-child { text-align: left; color: var(--text); font-size: 12.5px; }
+.battle-review-table td:nth-child(2),
+.battle-review-table td:nth-child(3) { text-align: center; }
+.tc { color: var(--green); font-weight: 800; font-size: 16px; }
+.tx { color: var(--red); font-weight: 800; font-size: 16px; }
+
+.teach-box {
+  background: var(--gold-bg);
+  border: 1px solid #FED7AA;
+  border-radius: var(--r-md);
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.teach-box-title { font-weight: 800; color: #B45309; margin-bottom: 8px; font-size: 12px; }
+.teach-box-text { color: var(--text); line-height: 1.65; font-size: 13px; }
+
+/* ====== 対戦開始画面 ======
+   赤〜オレンジのグラデーション背景に、ルール説明とマッチ開始ボタンを表示する */
+.battle-start-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 44px 24px 32px;
+  min-height: calc(100vh - 80px);
+  background:
+    radial-gradient(600px 400px at 80% -10%, rgba(255, 200, 100, 0.35), transparent 60%),
+    radial-gradient(500px 400px at 10% 110%, rgba(255, 90, 70, 0.4), transparent 60%),
+    linear-gradient(160deg, #DC2626 0%, #EA580C 50%, #F59E0B 100%);
+  color: white;
+  border-radius: 0 0 32px 32px;
+  position: relative;
+  overflow: hidden;
+}
+.battle-start-screen::before,
+.battle-start-screen::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  pointer-events: none;
+}
+.battle-start-screen::before { width: 280px; height: 280px; top: -100px; right: -90px; }
+.battle-start-screen::after  { width: 200px; height: 200px; bottom: -60px; left: -70px; }
+
+.battle-start-emblem {
+  width: 120px; height: 120px;
+  border-radius: 32px;
+  background: rgba(255,255,255,0.14);
+  border: 1.5px solid rgba(255,255,255,0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 22px;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 24px 48px rgba(220, 38, 38, 0.32), inset 0 1px 0 rgba(255,255,255,0.2);
+  animation: float 3.6s ease-in-out infinite;
+}
+.battle-start-emblem svg {
+  width: 64px; height: 64px;
+  color: white;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.18));
+}
+.battle-start-icon {
+  font-size: 0;
+  margin: 0;
+  animation: none;
+}
+
+.battle-start-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  margin-bottom: 14px;
+  letter-spacing: -0.8px;
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.12);
+}
+.battle-start-desc {
+  font-size: 14px;
+  color: rgba(255,255,255,0.92);
+  text-align: center;
+  line-height: 1.7;
+  margin-bottom: 28px;
+  font-weight: 500;
+  position: relative;
+  z-index: 1;
+}
+.battle-start-info {
+  background: rgba(255,255,255,0.16);
+  border-radius: var(--r-lg);
+  padding: 18px 20px;
+  width: 100%;
+  margin-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border: 1px solid rgba(255,255,255,0.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 1;
+}
+.battle-start-info-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+  color: white;
+  font-weight: 600;
+}
+.battle-start-info-row .info-icon {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: white;
+}
+.battle-start-info-row .info-icon svg { width: 18px; height: 18px; stroke-width: 2.2; }
+
+.battle-start-screen .screen-header { background: transparent; }
+.battle-start-screen .screen-header .header-title { color: white; }
+.battle-start-screen .screen-header .back-btn {
+  background: rgba(0,0,0,0.18);
+  border-color: rgba(255,255,255,0.32);
+  color: white;
+}
+
+.battle-start-screen .btn { position: relative; z-index: 1; }
+.battle-start-screen .btn-primary {
+  background: white;
+  color: #DC2626;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.18);
+}
+.battle-start-screen .btn-primary span.arrow-fab {
+  background: linear-gradient(135deg, #F87171, #DC2626);
+  color: white;
+}
+.battle-start-screen .btn-ghost {
+  background: rgba(255,255,255,0.14);
+  border: 1px solid rgba(255,255,255,0.28);
+  color: white;
+  backdrop-filter: blur(8px);
+}
+
+/* ====== 対戦履歴画面 ======
+   勝利・引き分け・敗北のサマリーと、過去の対戦記録を時系列で表示する */
+.bh-summary {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+.bh-summary-item { text-align: center; flex: 1; }
+.bh-summary-num {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.8px;
+}
+.bh-summary-num.win { color: var(--primary); }
+.bh-summary-num.draw { color: var(--gold); }
+.bh-summary-num.lose { color: var(--red); }
+.bh-summary-lbl { font-size: 11px; color: var(--text-3); font-weight: 700; margin-top: 6px; }
+.bh-summary-sep { width: 1px; height: 38px; background: var(--border-soft); }
+
+.bh-list { display: flex; flex-direction: column; gap: 8px; }
+.bh-row {
+  background: var(--surface);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bh-avatar { flex-shrink: 0; display: flex; align-items: center; }
+.bh-info { flex: 1; min-width: 0; }
+.bh-opponent { font-size: 13.5px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
+.bh-date { font-size: 11px; color: var(--text-3); margin-top: 2px; font-weight: 500; }
+.bh-score { font-size: 14px; font-weight: 800; color: var(--text); white-space: nowrap; font-family: 'Plus Jakarta Sans', sans-serif; }
+.bh-result {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.bh-win { background: var(--primary-soft); color: var(--primary-darker); }
+.bh-lose { background: var(--red-bg); color: #B91C1C; }
+.bh-draw { background: var(--gold-bg); color: #B45309; }
+.bh-pts { font-size: 13px; font-weight: 800; white-space: nowrap; flex-shrink: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+.bh-pts-pos { color: var(--primary); }
+.bh-pts-neg { color: var(--red); }
+.bh-pts-zero { color: var(--gold); }
+
