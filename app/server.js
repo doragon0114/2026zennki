@@ -1,9 +1,10 @@
+
+require("dotenv").config();
+
 const express = require("express");
 const session = require("express-session");
 const path = require("path");
 const http = require("http");
-
-require("dotenv").config();
 
 const authRoutes = require("./features/auth/authRoutes");
 const pageRoutes = require("./routes/pageRoutes");

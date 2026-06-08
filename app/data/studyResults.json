@@ -258,66 +258,12 @@
     "createdAt": "2026-05-29T07:29:12.614Z"
   },
   {
-    "id": "study_result_c23b12c6ec57",
-    "userId": "user_17d6bada3e",
-    "correct": 2,
+    "id": "study_result_55844eda14a3",
+    "userId": "user_f9c134d140",
+    "correct": 1,
     "total": 2,
-    "pct": 100,
-    "pointsGained": 20,
-    "answers": [
-      {
-        "questionId": "q_math_001",
-        "chosen": 1,
-        "correct": true
-      },
-      {
-        "questionId": "q_math_002",
-        "chosen": 2,
-        "correct": true
-      }
-    ],
-    "questionIds": [
-      "q_math_001",
-      "q_math_002"
-    ],
-    "startedAt": "2026-06-01T04:58:33.054Z",
-    "finishedAt": "2026-06-01T04:58:38.569Z",
-    "createdAt": "2026-06-01T04:58:38.576Z"
-  },
-  {
-    "id": "study_result_8f000a4ad866",
-    "userId": "user_17d6bada3e",
-    "correct": 2,
-    "total": 2,
-    "pct": 100,
-    "pointsGained": 20,
-    "answers": [
-      {
-        "questionId": "q_math_001",
-        "chosen": 1,
-        "correct": true
-      },
-      {
-        "questionId": "q_math_002",
-        "chosen": 2,
-        "correct": true
-      }
-    ],
-    "questionIds": [
-      "q_math_001",
-      "q_math_002"
-    ],
-    "startedAt": "2026-06-01T04:59:06.569Z",
-    "finishedAt": "2026-06-01T04:59:10.883Z",
-    "createdAt": "2026-06-01T04:59:10.894Z"
-  },
-  {
-    "id": "study_result_e19cced355b1",
-    "userId": "user_17d6bada3e",
-    "correct": 2,
-    "total": 2,
-    "pct": 100,
-    "pointsGained": 20,
+    "pct": 50,
+    "pointsGained": 10,
     "answers": [
       {
         "questionId": "q_math_002",
@@ -326,16 +272,16 @@
       },
       {
         "questionId": "q_math_001",
-        "chosen": 1,
-        "correct": true
+        "chosen": 0,
+        "correct": false
       }
     ],
     "questionIds": [
       "q_math_002",
       "q_math_001"
     ],
-    "startedAt": "2026-06-01T05:20:33.530Z",
-    "finishedAt": "2026-06-01T05:20:41.279Z",
-    "createdAt": "2026-06-01T05:20:41.289Z"
+    "startedAt": "2026-06-01T06:26:10.447Z",
+    "finishedAt": "2026-06-01T06:26:25.505Z",
+    "createdAt": "2026-06-01T06:26:25.513Z"
   }
 ]

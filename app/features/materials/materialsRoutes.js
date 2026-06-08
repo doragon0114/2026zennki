@@ -1,90 +1,162 @@
 const express = require("express");
-const materialsService = require("./materialsService");
+const db = require("../DB/dbRoutes");
 
 const router = express.Router();
 
-// GET /api/materials
-// studyData.json から問題セット一覧と問題一覧を返す
-router.get("/", (req, res) => {
-  const payload = materialsService.getMaterialsPayload();
+// ── ヘルパー: DB行 → フロント形式に変換 ──────────────
+async function buildPayload() {
+  const lists = await db.getAllQuestionLists();
 
-  res.json({
-    ok: true,
-    ...payload
-  });
+  const materials = await Promise.all(
+    lists.map(async (list) => {
+      const questions = await db.findQuestionsByListId(list.QLIST_ID);
+      return {
+        id: list.QLIST_ID,
+        name: `問題セット ${list.QLIST_ID}`,
+        category: list.CATEGORY_ID,
+        questionCount: questions.length,
+        shared: false,
+        type: "file",
+        createdAt: new Date().toISOString(),
+      };
+    })
+  );
+
+  const questionArrays = await Promise.all(
+    lists.map(async (list) => {
+      const qs = await db.findQuestionsByListId(list.QLIST_ID);
+      return qs.map((q) => ({
+        id: q.QID,
+        materialId: q.QLIST_ID,
+        text: q.QUESTION,
+        choices: [q.ANSWER, q.MISS_ONE, q.MISS_TWO, q.MISS_THREE],
+        correct: 0,
+        explanation: q.EXPLAIN || "",
+        category: list.CATEGORY_ID,
+        tags: [],
+      }));
+    })
+  );
+
+  return {
+    materials,
+    questions: questionArrays.flat(),
+  };
+}
+
+// GET /api/materials
+router.get("/", async (req, res) => {
+  try {
+    const payload = await buildPayload();
+    res.json({ ok: true, ...payload });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
 });
 
 // GET /api/materials/:materialId
-// 特定の問題セット詳細を返す
-router.get("/:materialId", (req, res) => {
-  const detail = materialsService.getMaterialDetail(req.params.materialId);
+router.get("/:materialId", async (req, res) => {
+  try {
+    const list = await db.findQuestionListById(req.params.materialId);
+    if (!list) {
+      return res.status(404).json({ ok: false, message: "問題セットが見つかりません" });
+    }
 
-  if (!detail) {
-    return res.status(404).json({
-      ok: false,
-      message: "問題セットが見つかりません"
-    });
+    const qs = await db.findQuestionsByListId(list.QLIST_ID);
+    const material = {
+      id: list.QLIST_ID,
+      name: `問題セット ${list.QLIST_ID}`,
+      category: list.CATEGORY_ID,
+      questionCount: qs.length,
+      shared: false,
+      type: "file",
+      createdAt: new Date().toISOString(),
+    };
+    const questions = qs.map((q) => ({
+      id: q.QID,
+      materialId: q.QLIST_ID,
+      text: q.QUESTION,
+      choices: [q.ANSWER, q.MISS_ONE, q.MISS_TWO, q.MISS_THREE],
+      correct: 0,
+      explanation: q.EXPLAIN || "",
+      category: list.CATEGORY_ID,
+      tags: [],
+    }));
+
+    res.json({ ok: true, material, questions });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err.message });
   }
-
-  res.json({
-    ok: true,
-    ...detail
-  });
 });
 
 // PATCH /api/materials/:materialId/share
-// 問題セットの公開状態を変更する
-router.patch("/:materialId/share", (req, res) => {
-  const result = materialsService.shareMaterial(req.params.materialId, req.body.shared);
-
-  if (!result.ok) {
-    return res.status(404).json(result);
+router.patch("/:materialId/share", async (req, res) => {
+  try {
+    const list = await db.findQuestionListById(req.params.materialId);
+    if (!list) {
+      return res.status(404).json({ ok: false, message: "問題セットが見つかりません" });
+    }
+    // TODO: sharedフラグをDBに保存する場合はQUESTION_LISTにカラム追加
+    const payload = await buildPayload();
+    res.json({ ok: true, ...payload });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err.message });
   }
-
-  res.json(result);
 });
 
 // POST /api/materials/:materialId/questions
-// 問題を追加する
-router.post("/:materialId/questions", (req, res) => {
-  const result = materialsService.createQuestion(req.params.materialId, req.body);
+router.post("/:materialId/questions", async (req, res) => {
+  try {
+    const { materialId } = req.params;
+    const list = await db.findQuestionListById(materialId);
+    if (!list) {
+      return res.status(404).json({ ok: false, message: "問題セットが見つかりません" });
+    }
 
-  if (!result.ok) {
-    return res.status(400).json(result);
+    const qid = require("crypto").randomBytes(2).toString("hex");
+    await db.createQuestion(qid, materialId, req.body);
+
+    const payload = await buildPayload();
+    res.json({ ok: true, ...payload });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err.message });
   }
-
-  res.json(result);
 });
 
 // PUT /api/materials/:materialId/questions/:questionId
-// 問題を編集する
-router.put("/:materialId/questions/:questionId", (req, res) => {
-  const result = materialsService.updateQuestion(
-    req.params.materialId,
-    req.params.questionId,
-    req.body
-  );
+router.put("/:materialId/questions/:questionId", async (req, res) => {
+  try {
+    const { questionId } = req.params;
+    const q = await db.findQuestionById(questionId);
+    if (!q) {
+      return res.status(404).json({ ok: false, message: "問題が見つかりません" });
+    }
 
-  if (!result.ok) {
-    return res.status(400).json(result);
+    await db.updateQuestion(questionId, req.body);
+
+    const payload = await buildPayload();
+    res.json({ ok: true, ...payload });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err.message });
   }
-
-  res.json(result);
 });
 
 // DELETE /api/materials/:materialId/questions/:questionId
-// 問題を削除する
-router.delete("/:materialId/questions/:questionId", (req, res) => {
-  const result = materialsService.removeQuestion(
-    req.params.materialId,
-    req.params.questionId
-  );
+router.delete("/:materialId/questions/:questionId", async (req, res) => {
+  try {
+    const { questionId } = req.params;
+    const q = await db.findQuestionById(questionId);
+    if (!q) {
+      return res.status(404).json({ ok: false, message: "問題が見つかりません" });
+    }
 
-  if (!result.ok) {
-    return res.status(404).json(result);
+    await db.deleteQuestion(questionId);
+
+    const payload = await buildPayload();
+    res.json({ ok: true, ...payload });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err.message });
   }
-
-  res.json(result);
 });
 
 module.exports = router;
