@@ -1,5 +1,6 @@
 const WebSocket = require("ws");
 const crypto = require("crypto");
+const battleHistoryRepository = require("./battleHistoryRepository");
 
 const {
   getSubjectLabel,
@@ -106,6 +107,7 @@ function handleJoin(player, data) {
   player.age = Number(data.age || 15);
   player.subject = data.subject || "math";
   player.avatar = data.avatar || "🐧";
+  player.userId = data.userId || player.id;
 
   if (!Number.isInteger(player.age) || player.age < 1 || player.age > 120) {
     send(player.ws, "error", {
@@ -317,6 +319,74 @@ function handleReadyNext(player) {
   }
 }
 
+const BATTLE_POINT_WIN = 30;
+const BATTLE_POINT_DRAW = 10;
+
+function formatHistoryDate(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+
+  return `${y}/${m}/${d}`;
+}
+
+function buildHistoryRecord({ room, player, opponent, myScore, oppScore }) {
+  let result = "draw";
+  let pts = BATTLE_POINT_DRAW;
+
+  if (myScore > oppScore) {
+    result = "win";
+    pts = BATTLE_POINT_WIN;
+  } else if (myScore < oppScore) {
+    result = "lose";
+    pts = 0;
+  }
+
+  return {
+    id: `bh_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    roomId: room.id,
+    userId: player.userId || player.id,
+    playerName: player.name,
+    opponentUserId: opponent.userId || opponent.id,
+    opponent: opponent.name,
+    avatar: opponent.avatar || "🤖",
+    result,
+    myScore,
+    oppScore,
+    pts,
+    subject: room.subject,
+    age: room.age,
+    date: formatHistoryDate(),
+    createdAt: new Date().toISOString()
+  };
+}
+
+function saveRoomHistory(room) {
+  const [playerA, playerB] = room.players;
+
+  const scoreA = room.scores[playerA.id] || 0;
+  const scoreB = room.scores[playerB.id] || 0;
+
+  const records = [
+    buildHistoryRecord({
+      room,
+      player: playerA,
+      opponent: playerB,
+      myScore: scoreA,
+      oppScore: scoreB
+    }),
+    buildHistoryRecord({
+      room,
+      player: playerB,
+      opponent: playerA,
+      myScore: scoreB,
+      oppScore: scoreA
+    })
+  ];
+
+  battleHistoryRepository.saveBattleHistory(records);
+}
+
 function finishRoom(room) {
   if (!room || room.finished) {
     return;
@@ -337,6 +407,8 @@ function finishRoom(room) {
   } else if (scoreB > scoreA) {
     message = `${playerB.name}さんの勝利です。`;
   }
+
+  saveRoomHistory(room);
 
   broadcast(room, "finished", {
     message,

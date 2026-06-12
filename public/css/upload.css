@@ -1,0 +1,127 @@
+/* ============================================================
+   css/upload.css — アップロード・AI解析画面（js/upload.js 担当）
+============================================================ */
+
+/* ====== 資料アップロード画面 ======
+   カメラ撮影・ファイル選択の切り替えボタンとドロップエリアを含む */
+.upload-section-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3);
+  margin-bottom: 12px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.upload-area {
+  border: 2px dashed var(--primary);
+  border-radius: var(--r-xl);
+  padding: 36px 20px 32px;
+  text-align: center;
+  cursor: pointer;
+  background: linear-gradient(180deg, var(--primary-tint), rgba(239,246,255,0));
+  transition: all 0.2s;
+  margin-bottom: 16px;
+}
+.upload-area:hover { background: var(--primary-soft); border-color: var(--primary-dark); }
+.upload-area-icon-wrap {
+  width: 64px; height: 64px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #60A5FA, var(--primary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+  box-shadow: 0 10px 24px rgba(59,130,246,0.35);
+  color: white;
+}
+.upload-area-icon-wrap svg { width: 30px; height: 30px; stroke-width: 2.2; }
+.upload-area-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--primary-darker);
+  margin-bottom: 4px;
+  letter-spacing: -0.2px;
+}
+.upload-area-sub {
+  font-size: 12px;
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.upload-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+.upload-method-btn {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family: inherit;
+  box-shadow: var(--shadow-xs);
+}
+.upload-method-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.upload-method-btn.selected {
+  border-color: var(--primary);
+  background: var(--primary-tint);
+  box-shadow: 0 6px 18px rgba(59,130,246,0.14);
+}
+
+.upload-method-icon-tile {
+  width: 52px; height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+.upload-method-icon-tile svg { width: 26px; height: 26px; }
+.upload-method-icon-tile.blue   { background: var(--primary-soft); color: var(--primary-dark); }
+.upload-method-icon-tile.purple { background: var(--purple-bg);     color: var(--purple); }
+.upload-method-icon-tile.green  { background: var(--green-bg);      color: var(--green); }
+
+.upload-method-label { font-size: 13.5px; font-weight: 800; color: var(--text); letter-spacing: -0.2px; }
+.upload-method-sub   { font-size: 11.5px; color: var(--text-3); font-weight: 500; }
+
+.file-chosen {
+  background: var(--primary-tint);
+  border: 1.5px solid var(--primary);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--primary-darker);
+  font-weight: 700;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.file-chosen.hidden { display: none; }
+
+/* ====== AI解析中画面 ======
+   4ステップのアニメーションでAI処理の進行を視覚的に表示する */
+.analyzing-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  padding: 20px;
+  gap: 20px;
+  text-align: center;
+}
+.analyzing-icon { display: flex; align-items: center; justify-content: center; color: var(--primary); animation: pulse 1.4s ease-in-out infinite; }
+.analyzing-title { font-size: 18px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; }
+.analyzing-sub { font-size: 13px; color: var(--text-3); font-weight: 500; }
+.analyzing-steps { width: 100%; max-width: 280px; }
+.step-item { display: flex; align-items: center; gap: 12px; padding: 9px 0; font-size: 13px; color: var(--text-3); font-weight: 500; }
+.step-item.done { color: var(--green); font-weight: 700; }
+.step-item.active { color: var(--primary); font-weight: 700; }
+.step-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+.step-item.done .step-dot { background: var(--green); }
+.step-item.active .step-dot { background: var(--primary); animation: pulse 1s infinite; }
+
