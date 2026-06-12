@@ -10,6 +10,30 @@ const pool = mysql.createPool({
   connectionLimit: 10,
 });
 
+// ── ヘルパー: DB行 → シャッフル済み選択肢に変換 ──
+function convertQuestion(q) {
+  const choices = [
+    { text: q.ANSWER,     isCorrect: true  },
+    { text: q.MISS_ONE,   isCorrect: false },
+    { text: q.MISS_TWO,   isCorrect: false },
+    { text: q.MISS_THREE, isCorrect: false },
+  ];
+
+  // シャッフル
+  for (let i = choices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [choices[i], choices[j]] = [choices[j], choices[i]];
+  }
+
+  const correct = choices.findIndex(c => c.isCorrect);
+
+  return {
+    ...q,
+    choices: choices.map(c => c.text),
+    correct,
+  };
+}
+
 // 問題リスト一覧取得
 async function getAllQuestionLists() {
   const [rows] = await pool.query("SELECT * FROM QUESTION_LIST");
@@ -40,7 +64,7 @@ async function findQuestionsByListId(qlistId) {
     "SELECT * FROM QUESTION WHERE QLIST_ID = ?",
     [qlistId]
   );
-  return rows;
+  return rows.map(q => convertQuestion(q));
 }
 
 // 問題1件取得
@@ -49,7 +73,7 @@ async function findQuestionById(qid) {
     "SELECT * FROM QUESTION WHERE QID = ?",
     [qid]
   );
-  return rows[0] || null;
+  return rows[0] ? convertQuestion(rows[0]) : null;
 }
 
 // 問題追加

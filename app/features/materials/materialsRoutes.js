@@ -29,8 +29,8 @@ async function buildPayload() {
         id: q.QID,
         materialId: q.QLIST_ID,
         text: q.QUESTION,
-        choices: [q.ANSWER, q.MISS_ONE, q.MISS_TWO, q.MISS_THREE],
-        correct: 0,
+        choices: q.choices,   // ← 修正
+        correct: q.correct,   // ← 修正
         explanation: q.EXPLAIN || "",
         category: list.CATEGORY_ID,
         tags: [],

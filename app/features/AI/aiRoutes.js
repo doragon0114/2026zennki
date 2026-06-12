@@ -67,8 +67,8 @@ router.post('/generate', async (req, res) => {
       "C": "選択肢C",
       "D": "選択肢D"
     },
-    "answer": "A or B or C or D", // 正解の選択肢はランダムにしてください
-    "explanation": "解説文をここに書く"
+    "answer":"     " 5問の正解をA・B・C・Dに1〜2問ずつ分散させること。具体的に：問1=C, 問2=A, 問3=D, 問4=B, 問5=C のように偏りをなくす。
+    "explanation": "正解の根拠（1〜2文）+代表的な誤答がなぜ違うか（1文）"
   }
 ]
 
