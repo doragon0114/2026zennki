@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const db = require("../../db/mysqlPool");
+const db = require("../DB/dbRoutes");
 
 function createRandomId(prefix, byteLength = 4) {
   return `${prefix}_${crypto.randomBytes(byteLength).toString("hex")}`;

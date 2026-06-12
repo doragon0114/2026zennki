@@ -1,64 +1,131 @@
+const path = require("path");
 const mysql = require("mysql2/promise");
 
-const pool = mysql.createPool({
-  host:     process.env.DB_HOST     ,
-  port:     process.env.DB_PORT     ,
-  user:     process.env.DB_USER     ,
-  password: process.env.DB_PASSWORD ,
-  database: process.env.DB_NAME    ,
-  waitForConnections: true,
-  connectionLimit: 10,
+require("dotenv").config({
+  path: path.resolve(process.cwd(), ".env")
 });
 
-// 問題リスト一覧取得
+function getRequiredEnv(name, fallback = "") {
+  const value = process.env[name];
+
+  if (value !== undefined && value !== "") {
+    return value;
+  }
+
+  return fallback;
+}
+
+function getNumberEnv(name, fallback) {
+  const value = process.env[name];
+
+  if (value === undefined || value === "") {
+    return fallback;
+  }
+
+  const number = Number(value);
+
+  if (Number.isNaN(number)) {
+    return fallback;
+  }
+
+  return number;
+}
+
+const mysqlConfig = {
+  host: getRequiredEnv("DB_HOST", "mysql"),
+  port: getNumberEnv("DB_PORT", 3306),
+  user: getRequiredEnv("DB_USER", "root"),
+  password: getRequiredEnv("DB_PASSWORD", ""),
+  database: getRequiredEnv("DB_NAME", "revino"),
+
+  waitForConnections: true,
+  connectionLimit: getNumberEnv("DB_CONNECTION_LIMIT", 10),
+  queueLimit: 0,
+  charset: "utf8mb4"
+};
+
+const pool = mysql.createPool(mysqlConfig);
+
+async function testMysqlConnection() {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.ping();
+
+    console.log(
+      `[mysql] connected: ${mysqlConfig.user}@${mysqlConfig.host}:${mysqlConfig.port}/${mysqlConfig.database}`
+    );
+
+    return true;
+  } finally {
+    connection.release();
+  }
+}
+
+// ==================================================
+// 既存の問題リスト系DB処理
+// ==================================================
+
 async function getAllQuestionLists() {
   const [rows] = await pool.query("SELECT * FROM QUESTION_LIST");
   return rows;
 }
 
-// 問題リスト1件取得
 async function findQuestionListById(qlistId) {
   const [rows] = await pool.query(
     "SELECT * FROM QUESTION_LIST WHERE QLIST_ID = ?",
     [qlistId]
   );
+
   return rows[0] || null;
 }
 
-// 問題リスト作成
 async function createQuestionList(qlistId, categoryId) {
   await pool.query(
     "INSERT INTO QUESTION_LIST (QLIST_ID, CATEGORY_ID) VALUES (?, ?)",
     [qlistId, categoryId]
   );
-  return findQuestionListById(qlistId);
+
+  return await findQuestionListById(qlistId);
 }
 
-// 問題リストに紐づく問題を全件取得
 async function findQuestionsByListId(qlistId) {
   const [rows] = await pool.query(
     "SELECT * FROM QUESTION WHERE QLIST_ID = ?",
     [qlistId]
   );
+
   return rows;
 }
 
-// 問題1件取得
 async function findQuestionById(qid) {
   const [rows] = await pool.query(
     "SELECT * FROM QUESTION WHERE QID = ?",
     [qid]
   );
+
   return rows[0] || null;
 }
 
-// 問題追加
 async function createQuestion(qid, qlistId, body) {
   const wrong = body.choices.filter((_, i) => i !== body.correct);
+
   await pool.query(
-    `INSERT INTO QUESTION
-      (QID, QLIST_ID, QUESTION, ANSWER, MISS_ONE, MISS_TWO, MISS_THREE, \`EXPLAIN\`)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `
+    INSERT INTO QUESTION
+      (
+        QID,
+        QLIST_ID,
+        QUESTION,
+        ANSWER,
+        MISS_ONE,
+        MISS_TWO,
+        MISS_THREE,
+        \`EXPLAIN\`
+      )
+    VALUES
+      (?, ?, ?, ?, ?, ?, ?, ?)
+    `,
     [
       qid,
       qlistId,
@@ -70,21 +137,25 @@ async function createQuestion(qid, qlistId, body) {
       body.explanation || ""
     ]
   );
-  return findQuestionById(qid);
+
+  return await findQuestionById(qid);
 }
 
-// 問題更新
 async function updateQuestion(qid, body) {
   const wrong = body.choices.filter((_, i) => i !== body.correct);
+
   await pool.query(
-    `UPDATE QUESTION SET
-      QUESTION   = ?,
-      ANSWER     = ?,
-      MISS_ONE   = ?,
-      MISS_TWO   = ?,
+    `
+    UPDATE QUESTION
+    SET
+      QUESTION = ?,
+      ANSWER = ?,
+      MISS_ONE = ?,
+      MISS_TWO = ?,
       MISS_THREE = ?,
       \`EXPLAIN\` = ?
-     WHERE QID = ?`,
+    WHERE QID = ?
+    `,
     [
       body.text,
       body.choices[body.correct],
@@ -95,22 +166,30 @@ async function updateQuestion(qid, body) {
       qid
     ]
   );
-  return findQuestionById(qid);
+
+  return await findQuestionById(qid);
 }
 
-// 問題削除
 async function deleteQuestion(qid) {
-  await pool.query("DELETE FROM QUESTION WHERE QID = ?", [qid]);
+  await pool.query(
+    "DELETE FROM QUESTION WHERE QID = ?",
+    [qid]
+  );
 }
 
-module.exports = {
-  pool,
-  getAllQuestionLists,
-  findQuestionListById,
-  createQuestionList,
-  findQuestionsByListId,
-  findQuestionById,
-  createQuestion,
-  updateQuestion,
-  deleteQuestion,
-};
+// ==================================================
+// export
+// ==================================================
+// pool自体に関数を追加して export する。
+pool.testMysqlConnection = testMysqlConnection;
+
+pool.getAllQuestionLists = getAllQuestionLists;
+pool.findQuestionListById = findQuestionListById;
+pool.createQuestionList = createQuestionList;
+pool.findQuestionsByListId = findQuestionsByListId;
+pool.findQuestionById = findQuestionById;
+pool.createQuestion = createQuestion;
+pool.updateQuestion = updateQuestion;
+pool.deleteQuestion = deleteQuestion;
+
+module.exports = pool;

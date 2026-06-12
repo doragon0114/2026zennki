@@ -1,5 +1,7 @@
 const crypto = require("crypto");
-const db = require("../../db/mysqlPool");
+
+// app/features/auth/authMysqlRepository.js から app/DB/dbRoutes.js を読む場合
+const db = require("../DB/dbRoutes");
 
 /* ============================================================
    ID生成
@@ -29,22 +31,22 @@ async function createUniqueUserId(connection) {
   }
 }
 
-async function createUniqueTagId(connection) {
+async function createUniqueUserTagId(connection) {
   while (true) {
-    const tagId = createRandomId("tag", 4);
+    const userTagId = createRandomId("utag", 5);
 
     const [rows] = await connection.query(
       `
-      SELECT tag_id
-      FROM tags
-      WHERE tag_id = ?
+      SELECT user_tag_id
+      FROM user_tags
+      WHERE user_tag_id = ?
       LIMIT 1
       `,
-      [tagId]
+      [userTagId]
     );
 
     if (rows.length === 0) {
-      return tagId;
+      return userTagId;
     }
   }
 }
@@ -130,104 +132,59 @@ function normalizeUserTags(userTags) {
 }
 
 /* ============================================================
-   タグ処理
-   tagsテーブルに存在しないタグはINSERTする。
-   users側には user_tag_ids_json として tagId 配列を保存する。
+   user_tags 処理
+   今回は中間テーブルなし。
+   user_tags に user_id を直接保存する。
 ============================================================ */
 
-function parseTagIds(value) {
-  if (!value) {
-    return [];
-  }
+async function replaceUserTags(connection, userId, tagNames) {
+  const normalizedTags = normalizeUserTags(tagNames);
 
-  if (Array.isArray(value)) {
-    return value;
-  }
+  await connection.query(
+    `
+    DELETE FROM user_tags
+    WHERE user_id = ?
+    `,
+    [userId]
+  );
 
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-async function upsertTags(connection, tagNames) {
-  const tagRecords = [];
-
-  for (const tagName of tagNames) {
-    const normalizedName = String(tagName).trim();
-
-    const [existingRows] = await connection.query(
-      `
-      SELECT
-        tag_id AS tagId,
-        name
-      FROM tags
-      WHERE LOWER(name) = LOWER(?)
-      LIMIT 1
-      `,
-      [normalizedName]
-    );
-
-    if (existingRows.length > 0) {
-      tagRecords.push(existingRows[0]);
-      continue;
-    }
-
-    const tagId = await createUniqueTagId(connection);
+  for (const tagName of normalizedTags) {
+    const userTagId = await createUniqueUserTagId(connection);
 
     await connection.query(
       `
-      INSERT INTO tags
+      INSERT INTO user_tags
         (
-          tag_id,
-          name,
+          user_tag_id,
+          user_id,
+          user_tag_name,
           created_at
         )
       VALUES
-        (?, ?, NOW())
+        (?, ?, ?, NOW())
       `,
       [
-        tagId,
-        normalizedName
+        userTagId,
+        userId,
+        tagName
       ]
     );
-
-    tagRecords.push({
-      tagId,
-      name: normalizedName
-    });
   }
-
-  return tagRecords;
 }
 
-async function getTagNamesByIds(tagIds) {
-  if (!Array.isArray(tagIds) || tagIds.length === 0) {
-    return [];
-  }
-
-  const placeholders = tagIds.map(() => "?").join(",");
-
+async function getUserTagsByUserId(userId) {
   const [rows] = await db.query(
     `
     SELECT
-      tag_id AS tagId,
-      name
-    FROM tags
-    WHERE tag_id IN (${placeholders})
+      user_tag_name AS userTagName
+    FROM user_tags
+    WHERE user_id = ?
+    ORDER BY created_at ASC
     `,
-    tagIds
+    [userId]
   );
 
-  const tagMap = new Map(
-    rows.map(tag => [tag.tagId, tag.name])
-  );
-
-  return tagIds
-    .map(tagId => tagMap.get(tagId))
-    .filter(Boolean);
+  return rows.map(row => row.userTagName);
 }
 
 /* ============================================================
@@ -239,8 +196,7 @@ async function toPublicUser(userRow) {
     return null;
   }
 
-  const tagIds = parseTagIds(userRow.userTagIdsJson);
-  const userTags = await getTagNamesByIds(tagIds);
+  const userTags = await getUserTagsByUserId(userRow.userId);
 
   return {
     userId: userRow.userId,
@@ -275,7 +231,6 @@ async function createUser({
     await connection.beginTransaction();
 
     const normalizedEmail = email.trim().toLowerCase();
-    const normalizedTags = normalizeUserTags(userTags);
 
     const [emailRows] = await connection.query(
       `
@@ -292,9 +247,6 @@ async function createUser({
     }
 
     const userId = await createUniqueUserId(connection);
-    const tagRecords = await upsertTags(connection, normalizedTags);
-    const userTagIds = tagRecords.map(tag => tag.tagId);
-
     const { salt, passwordHash } = createPasswordHash(password);
 
     await connection.query(
@@ -304,26 +256,26 @@ async function createUser({
           user_id,
           username,
           profile,
-          user_tag_ids_json,
           email,
-          salt,
           password_hash,
+          salt,
           created_at,
           updated_at
         )
       VALUES
-        (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        (?, ?, ?, ?, ?, ?, NOW(), NOW())
       `,
       [
         userId,
         username.trim(),
         profile ? profile.trim() : "",
-        JSON.stringify(userTagIds),
         normalizedEmail,
-        salt,
-        passwordHash
+        passwordHash,
+        salt
       ]
     );
+
+    await replaceUserTags(connection, userId, userTags);
 
     await connection.commit();
 
@@ -354,10 +306,9 @@ async function loginUser({ loginId, password }) {
       user_id AS userId,
       username,
       profile,
-      user_tag_ids_json AS userTagIdsJson,
       email,
-      salt,
       password_hash AS passwordHash,
+      salt,
       created_at AS createdAt
     FROM users
     WHERE user_id = ?
@@ -386,7 +337,7 @@ async function loginUser({ loginId, password }) {
 }
 
 /* ============================================================
-   ログイン状態確認用
+   ログイン状態確認
 ============================================================ */
 
 async function findPublicUserByUserId(userId) {
@@ -396,7 +347,6 @@ async function findPublicUserByUserId(userId) {
       user_id AS userId,
       username,
       profile,
-      user_tag_ids_json AS userTagIdsJson,
       email,
       created_at AS createdAt
     FROM users
@@ -430,7 +380,6 @@ async function updateUserProfile(currentUserId, {
     await connection.beginTransaction();
 
     const normalizedEmail = email.trim().toLowerCase();
-    const normalizedTags = normalizeUserTags(userTags);
 
     const [targetRows] = await connection.query(
       `
@@ -464,16 +413,12 @@ async function updateUserProfile(currentUserId, {
       throw new Error("このメールアドレスは既に使われています");
     }
 
-    const tagRecords = await upsertTags(connection, normalizedTags);
-    const userTagIds = tagRecords.map(tag => tag.tagId);
-
     await connection.query(
       `
       UPDATE users
       SET
         username = ?,
         profile = ?,
-        user_tag_ids_json = ?,
         email = ?,
         updated_at = NOW()
       WHERE user_id = ?
@@ -481,11 +426,12 @@ async function updateUserProfile(currentUserId, {
       [
         username.trim(),
         profile ? profile.trim() : "",
-        JSON.stringify(userTagIds),
         normalizedEmail,
         currentUserId
       ]
     );
+
+    await replaceUserTags(connection, currentUserId, userTags);
 
     await connection.commit();
 
