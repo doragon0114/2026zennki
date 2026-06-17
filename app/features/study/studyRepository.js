@@ -5,31 +5,31 @@ async function buildStudyData() {
 
   const materials = await Promise.all(
     lists.map(async (list) => {
-      const questions = await db.findQuestionsByListId(list.QLIST_ID);
+      const questions = await db.findQuestionsByListId(list.material_id);
       return {
-        id: list.QLIST_ID,
-        name: `問題セット ${list.QLIST_ID}`,
-        category: list.CATEGORY_ID,
+        id:            list.material_id,
+        name:          list.material_name,
+        category:      list.category_id,
         questionCount: questions.length,
-        shared: false,
-        type: "file",
-        createdAt: new Date().toISOString(),
+        shared:        list.is_shared === 1,
+        type:          "file",
+        createdAt:     list.created_at,
       };
     })
   );
 
   const questionArrays = await Promise.all(
     lists.map(async (list) => {
-      const qs = await db.findQuestionsByListId(list.QLIST_ID);
+      const qs = await db.findQuestionsByListId(list.material_id);
       return qs.map((q) => ({
-        id: q.QID,
-        materialId: q.QLIST_ID,
-        text: q.QUESTION,
-        choices: [q.ANSWER, q.MISS_ONE, q.MISS_TWO, q.MISS_THREE],
-        correct: 0,
-        explanation: q.EXPLAIN || "",
-        category: list.CATEGORY_ID,
-        tags: [],
+        id:          q.question_id,
+        materialId:  q.material_id,
+        text:        q.question_text,
+        choices:     q.choices,
+        correct:     q.correct,
+        explanation: q.explanation || "",
+        category:    list.category_id,
+        tags:        [],
       }));
     })
   );
@@ -58,13 +58,13 @@ async function getQuestionById(questionId) {
   const q = await db.findQuestionById(questionId);
   if (!q) return null;
   return {
-    id: q.QID,
-    materialId: q.QLIST_ID,
-    text: q.QUESTION,
-    choices: [q.ANSWER, q.MISS_ONE, q.MISS_TWO, q.MISS_THREE],
-    correct: 0,
-    explanation: q.EXPLAIN || "",
-    tags: [],
+    id:          q.question_id,
+    materialId:  q.material_id,
+    text:        q.question_text,
+    choices:     q.choices,
+    correct:     q.correct,
+    explanation: q.explanation || "",
+    tags:        [],
   };
 }
 
@@ -74,7 +74,7 @@ async function getQuestionsByIds(questionIds) {
 }
 
 async function saveStudyResult(result) {
-  // TODO: ANSWERLISTテーブルへの保存は後で実装
+  // TODO: results テーブルへの保存は後で実装
   console.log("学習結果:", result);
   return result;
 }

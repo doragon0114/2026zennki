@@ -173,7 +173,11 @@ async function runAIAnalysis(params) {
     const genRes = await fetch('/api/AI/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: extractedText })
+      body: JSON.stringify({
+        text: extractedText,
+        userId: S.user?.userId || "guest",
+        materialName: params.name || "生成された問題セット",
+      })
     });
 
     const genText = await genRes.text();

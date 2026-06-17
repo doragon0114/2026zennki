@@ -1,39 +1,40 @@
 const express = require("express");
+const { randomUUID } = require("crypto");
 const db = require("../DB/dbRoutes");
 
 const router = express.Router();
 
-// ── ヘルパー: DB行 → フロント形式に変換 ──────────────
+// ── ヘルパー: DB行 → フロント形式に変換 ──
 async function buildPayload() {
   const lists = await db.getAllQuestionLists();
 
   const materials = await Promise.all(
     lists.map(async (list) => {
-      const questions = await db.findQuestionsByListId(list.QLIST_ID);
+      const questions = await db.findQuestionsByListId(list.material_id);
       return {
-        id: list.QLIST_ID,
-        name: `問題セット ${list.QLIST_ID}`,
-        category: list.CATEGORY_ID,
+        id:            list.material_id,
+        name:          list.material_name,
+        category:      list.category_id,
         questionCount: questions.length,
-        shared: false,
-        type: "file",
-        createdAt: new Date().toISOString(),
+        shared:        list.is_shared === 1,
+        type:          "file",
+        createdAt:     list.created_at,
       };
     })
   );
 
   const questionArrays = await Promise.all(
     lists.map(async (list) => {
-      const qs = await db.findQuestionsByListId(list.QLIST_ID);
+      const qs = await db.findQuestionsByListId(list.material_id);
       return qs.map((q) => ({
-        id: q.QID,
-        materialId: q.QLIST_ID,
-        text: q.QUESTION,
-        choices: [q.ANSWER, q.MISS_ONE, q.MISS_TWO, q.MISS_THREE],
-        correct: 0,
-        explanation: q.EXPLAIN || "",
-        category: list.CATEGORY_ID,
-        tags: [],
+        id:          q.question_id,
+        materialId:  q.material_id,
+        text:        q.question_text,
+        choices:     q.choices,
+        correct:     q.correct,
+        explanation: q.explanation || "",
+        category:    list.category_id,
+        tags:        [],
       }));
     })
   );
@@ -62,25 +63,25 @@ router.get("/:materialId", async (req, res) => {
       return res.status(404).json({ ok: false, message: "問題セットが見つかりません" });
     }
 
-    const qs = await db.findQuestionsByListId(list.QLIST_ID);
+    const qs = await db.findQuestionsByListId(list.material_id);
     const material = {
-      id: list.QLIST_ID,
-      name: `問題セット ${list.QLIST_ID}`,
-      category: list.CATEGORY_ID,
+      id:            list.material_id,
+      name:          list.material_name,
+      category:      list.category_id,
       questionCount: qs.length,
-      shared: false,
-      type: "file",
-      createdAt: new Date().toISOString(),
+      shared:        list.is_shared === 1,
+      type:          "file",
+      createdAt:     list.created_at,
     };
     const questions = qs.map((q) => ({
-      id: q.QID,
-      materialId: q.QLIST_ID,
-      text: q.QUESTION,
-      choices: [q.ANSWER, q.MISS_ONE, q.MISS_TWO, q.MISS_THREE],
-      correct: 0,
-      explanation: q.EXPLAIN || "",
-      category: list.CATEGORY_ID,
-      tags: [],
+      id:          q.question_id,
+      materialId:  q.material_id,
+      text:        q.question_text,
+      choices:     q.choices,
+      correct:     q.correct,
+      explanation: q.explanation || "",
+      category:    list.category_id,
+      tags:        [],
     }));
 
     res.json({ ok: true, material, questions });
@@ -92,11 +93,18 @@ router.get("/:materialId", async (req, res) => {
 // PATCH /api/materials/:materialId/share
 router.patch("/:materialId/share", async (req, res) => {
   try {
-    const list = await db.findQuestionListById(req.params.materialId);
+    const { materialId } = req.params;
+    const list = await db.findQuestionListById(materialId);
     if (!list) {
       return res.status(404).json({ ok: false, message: "問題セットが見つかりません" });
     }
-    // TODO: sharedフラグをDBに保存する場合はQUESTION_LISTにカラム追加
+
+    const shared = req.body.shared ? 1 : 0;
+    await db.pool.query(
+      "UPDATE Questions SET is_shared = ? WHERE material_id = ?",
+      [shared, materialId]
+    );
+
     const payload = await buildPayload();
     res.json({ ok: true, ...payload });
   } catch (err) {
@@ -113,8 +121,8 @@ router.post("/:materialId/questions", async (req, res) => {
       return res.status(404).json({ ok: false, message: "問題セットが見つかりません" });
     }
 
-    const qid = require("crypto").randomBytes(2).toString("hex");
-    await db.createQuestion(qid, materialId, req.body);
+    const questionId = randomUUID();
+    await db.createQuestion(questionId, materialId, req.body);
 
     const payload = await buildPayload();
     res.json({ ok: true, ...payload });
