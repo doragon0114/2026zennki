@@ -1,64 +1,131 @@
-const fs = require("fs");
-const path = require("path");
+const db = require("../DB/dbRoutes");
 
-const historyPath = path.join(__dirname, "../../data/battleHistory.json");
-
-// ==================================================
-// 仮DB Repository
-// 今は JSON に保存する。
-// 後で MySQL に移行する場合は、このファイルの中身をDB処理へ差し替える。
-// ==================================================
-
-function ensureHistoryFile() {
-  const dir = path.dirname(historyPath);
-
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
-  if (!fs.existsSync(historyPath)) {
-    fs.writeFileSync(historyPath, JSON.stringify([], null, 2), "utf-8");
-  }
+function toHistoryItem(row) {
+  return {
+    id: row.id,
+    roomId: row.roomId,
+    userId: row.userId,
+    playerName: row.playerName,
+    opponentUserId: row.opponentUserId,
+    opponent: row.opponent,
+    avatar: row.avatar || "🤖",
+    result: row.result,
+    myScore: Number(row.myScore || 0),
+    oppScore: Number(row.oppScore || 0),
+    pts: Number(row.pts || 0),
+    subject: row.subject,
+    age: Number(row.age || 0),
+    date: row.date || "",
+    createdAt: row.createdAt
+  };
 }
 
-function readHistory() {
-  ensureHistoryFile();
-
-  try {
-    const data = JSON.parse(fs.readFileSync(historyPath, "utf-8"));
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeHistory(history) {
-  ensureHistoryFile();
-  fs.writeFileSync(historyPath, JSON.stringify(history, null, 2), "utf-8");
-}
-
-function saveBattleHistory(records) {
-  const history = readHistory();
+async function saveBattleHistory(records) {
   const safeRecords = Array.isArray(records) ? records : [records];
 
-  safeRecords.forEach(record => {
-    history.push({
-      ...record,
-      createdAt: record.createdAt || new Date().toISOString()
-    });
-  });
+  if (safeRecords.length === 0) {
+    return [];
+  }
 
-  writeHistory(history);
+  const connection = await db.getConnection();
 
-  return safeRecords;
+  try {
+    await connection.beginTransaction();
+
+    for (const record of safeRecords) {
+      await connection.query(
+        `
+        INSERT INTO battle_history (
+          battle_history_id,
+          room_id,
+          user_id,
+          player_name,
+          opponent_user_id,
+          opponent_name,
+          opponent_avatar,
+          result,
+          my_score,
+          opp_score,
+          pts,
+          subject,
+          age,
+          battle_date,
+          created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          room_id = VALUES(room_id),
+          user_id = VALUES(user_id),
+          player_name = VALUES(player_name),
+          opponent_user_id = VALUES(opponent_user_id),
+          opponent_name = VALUES(opponent_name),
+          opponent_avatar = VALUES(opponent_avatar),
+          result = VALUES(result),
+          my_score = VALUES(my_score),
+          opp_score = VALUES(opp_score),
+          pts = VALUES(pts),
+          subject = VALUES(subject),
+          age = VALUES(age),
+          battle_date = VALUES(battle_date)
+        `,
+        [
+          record.id,
+          record.roomId,
+          record.userId,
+          record.playerName,
+          record.opponentUserId || null,
+          record.opponent,
+          record.avatar || "🤖",
+          record.result,
+          Number(record.myScore || 0),
+          Number(record.oppScore || 0),
+          Number(record.pts || 0),
+          record.subject,
+          Number(record.age || 0),
+          record.date || null,
+          record.createdAt ? new Date(record.createdAt) : new Date()
+        ]
+      );
+    }
+
+    await connection.commit();
+
+    return safeRecords;
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 }
 
-function getBattleHistoryByUserId(userId) {
-  const history = readHistory();
+async function getBattleHistoryByUserId(userId) {
+  const [rows] = await db.query(
+    `
+    SELECT
+      battle_history_id AS id,
+      room_id AS roomId,
+      user_id AS userId,
+      player_name AS playerName,
+      opponent_user_id AS opponentUserId,
+      opponent_name AS opponent,
+      opponent_avatar AS avatar,
+      result,
+      my_score AS myScore,
+      opp_score AS oppScore,
+      pts,
+      subject,
+      age,
+      battle_date AS date,
+      created_at AS createdAt
+    FROM battle_history
+    WHERE user_id = ?
+    ORDER BY created_at DESC
+    `,
+    [userId]
+  );
 
-  return history
-    .filter(item => String(item.userId) === String(userId))
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return rows.map(toHistoryItem);
 }
 
 module.exports = {

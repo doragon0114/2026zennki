@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const battleHistoryRepository = require("./battleHistoryRepository");
 
 const {
+  BATTLE_QUESTION_COUNT,
   getSubjectLabel,
   buildBattleQuestions,
   toPublicQuestion
@@ -12,12 +13,16 @@ const waitingPlayers = new Map();
 const playerRooms = new Map();
 const activeRooms = new Map();
 
+const BATTLE_POINT_WIN = 30;
+const BATTLE_POINT_DRAW = 10;
+const BATTLE_TIME_LIMIT = 15;
+
 function createId(prefix) {
   return `${prefix}_${crypto.randomBytes(5).toString("hex")}`;
 }
 
 function send(ws, type, payload = {}) {
-  if (ws.readyState !== WebSocket.OPEN) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
     return;
   }
 
@@ -50,20 +55,23 @@ function initBattleWebSocket(server) {
       name: "ゲスト",
       age: 15,
       subject: "math",
-      avatar: "🐧"
+      avatar: "🐧",
+      userId: null
     };
 
     send(ws, "connected", {
       playerId: player.id
     });
 
-    ws.on("message", raw => {
+    ws.on("message", async raw => {
       try {
         const data = JSON.parse(raw.toString());
-        handleMessage(player, data);
-      } catch {
+        await handleMessage(player, data);
+      } catch (err) {
+        console.error("battle websocket message error:", err);
+
         send(ws, "error", {
-          message: "通信データの形式が正しくありません"
+          message: err.message || "通信データの処理に失敗しました"
         });
       }
     });
@@ -76,10 +84,10 @@ function initBattleWebSocket(server) {
   console.log("Battle WebSocket is ready: /ws/battle");
 }
 
-function handleMessage(player, data) {
+async function handleMessage(player, data) {
   switch (data.type) {
     case "join":
-      handleJoin(player, data);
+      await handleJoin(player, data);
       break;
 
     case "submitAnswer":
@@ -102,7 +110,7 @@ function handleMessage(player, data) {
   }
 }
 
-function handleJoin(player, data) {
+async function handleJoin(player, data) {
   player.name = String(data.name || "ゲスト").trim().slice(0, 20);
   player.age = Number(data.age || 15);
   player.subject = data.subject || "math";
@@ -129,7 +137,7 @@ function handleJoin(player, data) {
 
   if (waiting && waiting.ws.readyState === WebSocket.OPEN && waiting.id !== player.id) {
     waitingPlayers.delete(key);
-    createRoom(waiting, player);
+    await createRoom(waiting, player);
     return;
   }
 
@@ -140,17 +148,19 @@ function handleJoin(player, data) {
   });
 }
 
-function createRoom(playerA, playerB) {
+async function createRoom(playerA, playerB) {
   const roomId = createId("room");
-  const questions = buildBattleQuestions(playerA.subject);
+  const questions = await buildBattleQuestions(playerA.subject);
 
-  if (questions.length < 5) {
+  if (questions.length < BATTLE_QUESTION_COUNT) {
     send(playerA.ws, "error", {
-      message: "この教科の問題が不足しています"
+      message: `${getSubjectLabel(playerA.subject)}の対戦用問題が不足しています。5問以上登録してください。`
     });
+
     send(playerB.ws, "error", {
-      message: "この教科の問題が不足しています"
+      message: `${getSubjectLabel(playerA.subject)}の対戦用問題が不足しています。5問以上登録してください。`
     });
+
     return;
   }
 
@@ -215,12 +225,12 @@ function nextQuestion(room) {
     total: room.questions.length,
     question: toPublicQuestion(question),
     scores: room.scores,
-    timeLimit: 15
+    timeLimit: BATTLE_TIME_LIMIT
   });
 
   room.timer = setTimeout(() => {
     closeQuestion(room, "時間切れです。");
-  }, 15000);
+  }, BATTLE_TIME_LIMIT * 1000);
 }
 
 function handleSubmitAnswer(player, data) {
@@ -245,7 +255,8 @@ function handleSubmitAnswer(player, data) {
 
   room.answers[player.id] = {
     chosen,
-    correct
+    correct,
+    questionId: question.id
   };
 
   if (correct) {
@@ -276,7 +287,8 @@ function closeQuestion(room, message) {
     if (!room.answers[player.id]) {
       room.answers[player.id] = {
         chosen: -1,
-        correct: false
+        correct: false,
+        questionId: question.id
       };
     }
   });
@@ -319,9 +331,6 @@ function handleReadyNext(player) {
   }
 }
 
-const BATTLE_POINT_WIN = 30;
-const BATTLE_POINT_DRAW = 10;
-
 function formatHistoryDate(date = new Date()) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -361,7 +370,7 @@ function buildHistoryRecord({ room, player, opponent, myScore, oppScore }) {
   };
 }
 
-function saveRoomHistory(room) {
+async function saveRoomHistory(room) {
   const [playerA, playerB] = room.players;
 
   const scoreA = room.scores[playerA.id] || 0;
@@ -384,10 +393,10 @@ function saveRoomHistory(room) {
     })
   ];
 
-  battleHistoryRepository.saveBattleHistory(records);
+  await battleHistoryRepository.saveBattleHistory(records);
 }
 
-function finishRoom(room) {
+async function finishRoom(room) {
   if (!room || room.finished) {
     return;
   }
@@ -408,7 +417,11 @@ function finishRoom(room) {
     message = `${playerB.name}さんの勝利です。`;
   }
 
-  saveRoomHistory(room);
+  try {
+    await saveRoomHistory(room);
+  } catch (err) {
+    console.error("saveRoomHistory error:", err);
+  }
 
   broadcast(room, "finished", {
     message,

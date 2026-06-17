@@ -17,6 +17,22 @@
 let materialsLoaded = false;
 let materialsLoading = false;
 
+function getCurrentUserId() {
+  return S.user?.userId || S.user?.id || "";
+}
+
+function withUserId(url) {
+  const userId = getCurrentUserId();
+
+  if (!userId) {
+    return url;
+  }
+
+  const sep = url.includes("?") ? "&" : "?";
+
+  return `${url}${sep}userId=${encodeURIComponent(userId)}`;
+}
+
 async function loadMaterialsFromServer(force = false) {
   if (materialsLoading) {
     return;
@@ -29,7 +45,7 @@ async function loadMaterialsFromServer(force = false) {
   materialsLoading = true;
 
   try {
-    const response = await fetch("/api/materials");
+    const response = await fetch(withUserId("/api/materials"));
     const data = await response.json();
 
     if (!response.ok || !data.ok) {
@@ -246,7 +262,7 @@ async function deleteQuestion(qid) {
   }
 
   try {
-    const response = await fetch(`/api/materials/${encodeURIComponent(materialId)}/questions/${encodeURIComponent(qid)}`, {
+    const response = await fetch(withUserId(`/api/materials/${encodeURIComponent(materialId)}/questions/${encodeURIComponent(qid)}`), {
       method: "DELETE"
     });
 
@@ -270,7 +286,7 @@ async function deleteQuestion(qid) {
    TODO(DB担当): サーバーへ公開フラグを送信する */
 async function shareSet(materialId, shared = true) {
   try {
-    const response = await fetch(`/api/materials/${encodeURIComponent(materialId)}/share`, {
+    const response = await fetch(withUserId(`/api/materials/${encodeURIComponent(materialId)}/share`), {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"
@@ -401,7 +417,7 @@ async function saveEdit() {
     if (editingQid.startsWith("__new__")) {
       const materialId = editingQid.replace("__new__", "");
 
-      response = await fetch(`/api/materials/${encodeURIComponent(materialId)}/questions`, {
+      response = await fetch(withUserId(`/api/materials/${encodeURIComponent(materialId)}/questions`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -430,7 +446,7 @@ async function saveEdit() {
       return;
     }
 
-    response = await fetch(`/api/materials/${encodeURIComponent(q.materialId)}/questions/${encodeURIComponent(q.id)}`, {
+    response = await fetch(withUserId(`/api/materials/${encodeURIComponent(q.materialId)}/questions/${encodeURIComponent(q.id)}`), {
       method: "PUT",
       headers: {
         "Content-Type": "application/json"
