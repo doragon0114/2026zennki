@@ -51,6 +51,10 @@ router.post("/ocr", async (req, res) => {
 
     const data = await response.json();
 
+    if (data.error) {
+      throw new Error(data.error.message || "Google Vision APIでエラーが発生しました");
+    }
+
     const text =
       data.responses?.[0]?.fullTextAnnotation?.text ||
       "テキストが見つかりませんでした";
@@ -74,6 +78,7 @@ router.post("/ocr", async (req, res) => {
 // POST /api/AI/generate
 //
 // 保存先:
+// categories
 // materials
 // question
 // question_choices
@@ -82,12 +87,19 @@ router.post("/ocr", async (req, res) => {
 // {
 //   text,
 //   userId,
-//   categoryId?,
+//   categoryId?,    // 数字
+//   categoryName?,  // 例: 基本情報
 //   materialName?
 // }
 // ==================================================
 router.post("/generate", async (req, res) => {
-  const { text, userId, categoryId, materialName } = req.body;
+  const {
+    text,
+    userId,
+    categoryId,
+    categoryName,
+    materialName
+  } = req.body;
 
   if (!text) {
     return res.status(400).json({
@@ -139,6 +151,11 @@ ${text}`,
       })
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Ollama API error: ${errorText}`);
+    }
+
     const data = await response.json();
 
     let raw = String(data.response || "")
@@ -189,20 +206,43 @@ ${text}`,
     });
 
     // ==================================================
-    // 3. materials に問題セットを作成
+    // 3. カテゴリを決定
+    // SQL変更後:
+    // categories.category_id は INT AUTO_INCREMENT
+    // ==================================================
+    let finalCategoryId = null;
+
+    if (categoryId !== undefined && categoryId !== null && categoryId !== "") {
+      const category = await db.findCategoryById(categoryId);
+
+      if (!category) {
+        return res.status(400).json({
+          ok: false,
+          error: "指定されたカテゴリIDが存在しません"
+        });
+      }
+
+      finalCategoryId = category.category_id;
+    } else if (categoryName) {
+      const category = await db.findOrCreateCategoryByName(categoryName);
+      finalCategoryId = category ? category.category_id : null;
+    }
+
+    // ==================================================
+    // 4. materials に問題セットを作成
     // ==================================================
     const materialId = randomUUID();
 
     await db.createQuestionList(
       materialId,
       userId,
-      categoryId || null,
+      finalCategoryId,
       materialName || "生成された問題セット",
       text
     );
 
     // ==================================================
-    // 4. question / question_choices に問題を保存
+    // 5. question / question_choices に問題を保存
     // ==================================================
     const saved = [];
 
@@ -217,6 +257,7 @@ ${text}`,
     res.json({
       ok: true,
       materialId,
+      categoryId: finalCategoryId,
       questions: normalized,
       saved
     });

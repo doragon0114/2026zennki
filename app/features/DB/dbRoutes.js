@@ -28,6 +28,20 @@ function correctIndexToLabel(index) {
   return labels[Number(index)] || "A";
 }
 
+function toNullableCategoryId(categoryId) {
+  if (categoryId === undefined || categoryId === null || categoryId === "") {
+    return null;
+  }
+
+  const value = Number(categoryId);
+
+  if (!Number.isInteger(value) || value <= 0) {
+    return null;
+  }
+
+  return value;
+}
+
 function normalizeQuestionBody(body) {
   const text = String(body.text || "").trim();
 
@@ -56,6 +70,122 @@ function normalizeQuestionBody(body) {
     correct,
     explanation
   };
+}
+
+// ==================================================
+// categories
+// category_id は INT UNSIGNED AUTO_INCREMENT 前提
+// ==================================================
+
+async function getAllCategories() {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      category_id,
+      category_name,
+      created_at
+    FROM categories
+    ORDER BY category_id ASC
+    `
+  );
+
+  return rows;
+}
+
+async function findCategoryById(categoryId) {
+  const id = toNullableCategoryId(categoryId);
+
+  if (!id) {
+    return null;
+  }
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      category_id,
+      category_name,
+      created_at
+    FROM categories
+    WHERE category_id = ?
+    LIMIT 1
+    `,
+    [id]
+  );
+
+  return rows[0] || null;
+}
+
+async function findCategoryByName(categoryName) {
+  const name = String(categoryName || "").trim();
+
+  if (!name) {
+    return null;
+  }
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      category_id,
+      category_name,
+      created_at
+    FROM categories
+    WHERE category_name = ?
+    LIMIT 1
+    `,
+    [name]
+  );
+
+  return rows[0] || null;
+}
+
+async function createCategory(categoryName) {
+  const name = String(categoryName || "").trim();
+
+  if (!name) {
+    return null;
+  }
+
+  const existing = await findCategoryByName(name);
+
+  if (existing) {
+    return existing;
+  }
+
+  try {
+    const [result] = await pool.query(
+      `
+      INSERT INTO categories (
+        category_name
+      )
+      VALUES (?)
+      `,
+      [name]
+    );
+
+    return await findCategoryById(result.insertId);
+  } catch (err) {
+    if (err.code === "ER_DUP_ENTRY") {
+      return await findCategoryByName(name);
+    }
+
+    throw err;
+  }
+}
+
+async function findOrCreateCategoryByName(categoryName) {
+  const name = String(categoryName || "").trim();
+
+  if (!name) {
+    return null;
+  }
+
+  const existing = await findCategoryByName(name);
+
+  if (existing) {
+    return existing;
+  }
+
+  return await createCategory(name);
 }
 
 // ==================================================
@@ -114,9 +244,9 @@ async function getQuestionWithChoices(questionId) {
 
 // ==================================================
 // 問題セット materials
+// materials.category_id は INT UNSIGNED NULL 前提
 // ==================================================
 
-// 問題セット一覧取得
 async function getAllQuestionLists() {
   const [rows] = await pool.query(
     `
@@ -140,7 +270,6 @@ async function getAllQuestionLists() {
   return rows;
 }
 
-// 問題セット1件取得
 async function findQuestionListById(materialId) {
   const [rows] = await pool.query(
     `
@@ -166,8 +295,9 @@ async function findQuestionListById(materialId) {
   return rows[0] || null;
 }
 
-// 問題セット作成
 async function createQuestionList(materialId, userId, categoryId, materialName, imageText) {
+  const finalCategoryId = toNullableCategoryId(categoryId);
+
   await pool.query(
     `
     INSERT INTO materials (
@@ -189,16 +319,15 @@ async function createQuestionList(materialId, userId, categoryId, materialName, 
     [
       materialId,
       userId,
-      categoryId || null,
+      finalCategoryId,
       materialName || "生成された問題セット",
       imageText || null
     ]
   );
 
-  return findQuestionListById(materialId);
+  return await findQuestionListById(materialId);
 }
 
-// 問題セットの公開状態更新
 async function updateQuestionListShare(materialId, shared) {
   await pool.query(
     `
@@ -214,14 +343,18 @@ async function updateQuestionListShare(materialId, shared) {
     ]
   );
 
-  return findQuestionListById(materialId);
+  return await findQuestionListById(materialId);
+}
+
+// materialsRoutes.js 側で古い名前を呼んでも落ちないように残す
+async function updateMaterialShare(materialId, shared) {
+  return await updateQuestionListShare(materialId, shared);
 }
 
 // ==================================================
 // 問題 question
 // ==================================================
 
-// 問題セットに紐づく問題を全件取得
 async function findQuestionsByListId(materialId) {
   const [rows] = await pool.query(
     `
@@ -241,12 +374,10 @@ async function findQuestionsByListId(materialId) {
   return questions.filter(Boolean);
 }
 
-// 問題1件取得
 async function findQuestionById(questionId) {
-  return getQuestionWithChoices(questionId);
+  return await getQuestionWithChoices(questionId);
 }
 
-// 問題 + 選択肢を追加
 async function createQuestion(questionId, materialId, body) {
   const input = normalizeQuestionBody(body);
 
@@ -303,10 +434,9 @@ async function createQuestion(questionId, materialId, body) {
     conn.release();
   }
 
-  return findQuestionById(questionId);
+  return await findQuestionById(questionId);
 }
 
-// 問題更新
 async function updateQuestion(questionId, body) {
   const input = normalizeQuestionBody(body);
 
@@ -369,10 +499,9 @@ async function updateQuestion(questionId, body) {
     conn.release();
   }
 
-  return findQuestionById(questionId);
+  return await findQuestionById(questionId);
 }
 
-// 問題削除
 async function deleteQuestion(questionId) {
   await pool.query(
     `
@@ -386,15 +515,22 @@ async function deleteQuestion(questionId) {
 module.exports = {
   pool,
 
-  // 他Repositoryから使う用
   query: (...args) => pool.query(...args),
   getConnection: () => pool.getConnection(),
+
+  // カテゴリ
+  getAllCategories,
+  findCategoryById,
+  findCategoryByName,
+  createCategory,
+  findOrCreateCategoryByName,
 
   // 問題セット
   getAllQuestionLists,
   findQuestionListById,
   createQuestionList,
   updateQuestionListShare,
+  updateMaterialShare,
 
   // 問題
   findQuestionsByListId,

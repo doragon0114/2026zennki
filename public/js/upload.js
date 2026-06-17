@@ -175,8 +175,9 @@ async function runAIAnalysis(params) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: extractedText,
-        userId: S.user?.userId || "guest",
+        userId: S.user?.userId || S.user?.id,
         materialName: params.name || "生成された問題セット",
+        categoryName: params.category || "一般"
       })
     });
 

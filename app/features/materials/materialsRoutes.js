@@ -8,8 +8,10 @@ function toFrontMaterial(list, questionCount = 0) {
   return {
     id: list.material_id,
     name: list.material_name,
-    category: list.category_name || list.category_id || "未分類",
-    categoryId: list.category_id,
+    category: list.category_name || "未分類",
+    categoryId: list.category_id === null || list.category_id === undefined
+      ? null
+      : Number(list.category_id),
     questionCount,
     shared: Number(list.is_shared) === 1,
     type: "file",
@@ -26,7 +28,10 @@ function toFrontQuestion(q, material) {
     choices: Array.isArray(q.choices) ? q.choices : [],
     correct: Number.isInteger(q.correct) ? q.correct : 0,
     explanation: q.explanation || "",
-    category: material?.category_name || material?.category_id || "未分類",
+    category: material?.category_name || "未分類",
+    categoryId: material?.category_id === null || material?.category_id === undefined
+      ? null
+      : Number(material.category_id),
     tags: [],
     createdAt: q.created_at,
     updatedAt: q.updated_at
@@ -140,7 +145,7 @@ router.patch("/:materialId/share", async (req, res) => {
       });
     }
 
-    await db.updateMaterialShare(materialId, Boolean(req.body.shared));
+    await db.updateQuestionListShare(materialId, Boolean(req.body.shared));
 
     const payload = await buildPayload();
 
