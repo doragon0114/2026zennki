@@ -4,9 +4,34 @@ const db = require("../DB/dbRoutes");
 
 const router = express.Router();
 
+function getRequestUserId(req) {
+  return (
+    req.session?.userId ||
+    req.query.userId ||
+    req.body?.userId ||
+    req.headers["x-user-id"] ||
+    null
+  );
+}
+
+function requireUserId(req, res) {
+  const userId = getRequestUserId(req);
+
+  if (!userId) {
+    res.status(401).json({
+      ok: false,
+      message: "ログインユーザーが確認できません"
+    });
+    return null;
+  }
+
+  return userId;
+}
+
 function toFrontMaterial(list, questionCount = 0) {
   return {
     id: list.material_id,
+    userId: list.user_id,
     name: list.material_name,
     category: list.category_name || "未分類",
     categoryId: list.category_id === null || list.category_id === undefined
@@ -38,9 +63,8 @@ function toFrontQuestion(q, material) {
   };
 }
 
-// ── ヘルパー: DB行 → フロント形式に変換 ──
-async function buildPayload() {
-  const lists = await db.getAllQuestionLists();
+async function buildPayload(userId) {
+  const lists = await db.getQuestionListsByUserId(userId);
 
   const materialPairs = await Promise.all(
     lists.map(async (list) => {
@@ -71,11 +95,14 @@ async function buildPayload() {
 
 // ==================================================
 // GET /api/materials
-// 問題セット一覧
+// 自分の問題セットだけ取得
 // ==================================================
 router.get("/", async (req, res) => {
   try {
-    const payload = await buildPayload();
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const payload = await buildPayload(userId);
 
     res.json({
       ok: true,
@@ -93,30 +120,31 @@ router.get("/", async (req, res) => {
 
 // ==================================================
 // GET /api/materials/:materialId
-// 問題セット詳細
+// 自分の問題セットだけ詳細取得
 // ==================================================
 router.get("/:materialId", async (req, res) => {
   try {
-    const list = await db.findQuestionListById(req.params.materialId);
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const list = await db.findQuestionListByIdAndUserId(
+      req.params.materialId,
+      userId
+    );
 
     if (!list) {
       return res.status(404).json({
         ok: false,
-        message: "問題セットが見つかりません"
+        message: "問題セットが見つからないか、管理権限がありません"
       });
     }
 
     const qs = await db.findQuestionsByListId(list.material_id);
 
-    const material = toFrontMaterial(list, qs.length);
-    const questions = qs.map(q => {
-      return toFrontQuestion(q, list);
-    });
-
     res.json({
       ok: true,
-      material,
-      questions
+      material: toFrontMaterial(list, qs.length),
+      questions: qs.map(q => toFrontQuestion(q, list))
     });
   } catch (err) {
     console.error("GET /api/materials/:materialId error:", err);
@@ -130,24 +158,27 @@ router.get("/:materialId", async (req, res) => {
 
 // ==================================================
 // PATCH /api/materials/:materialId/share
-// 公開・非公開切り替え
+// 自分の問題セットだけ公開・非公開切り替え
 // ==================================================
 router.patch("/:materialId/share", async (req, res) => {
   try {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     const { materialId } = req.params;
 
-    const list = await db.findQuestionListById(materialId);
+    const list = await db.findQuestionListByIdAndUserId(materialId, userId);
 
     if (!list) {
       return res.status(404).json({
         ok: false,
-        message: "問題セットが見つかりません"
+        message: "問題セットが見つからないか、管理権限がありません"
       });
     }
 
     await db.updateQuestionListShare(materialId, Boolean(req.body.shared));
 
-    const payload = await buildPayload();
+    const payload = await buildPayload(userId);
 
     res.json({
       ok: true,
@@ -165,18 +196,21 @@ router.patch("/:materialId/share", async (req, res) => {
 
 // ==================================================
 // POST /api/materials/:materialId/questions
-// 問題追加
+// 自分の問題セットだけ問題追加
 // ==================================================
 router.post("/:materialId/questions", async (req, res) => {
   try {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     const { materialId } = req.params;
 
-    const list = await db.findQuestionListById(materialId);
+    const list = await db.findQuestionListByIdAndUserId(materialId, userId);
 
     if (!list) {
       return res.status(404).json({
         ok: false,
-        message: "問題セットが見つかりません"
+        message: "問題セットが見つからないか、管理権限がありません"
       });
     }
 
@@ -184,7 +218,7 @@ router.post("/:materialId/questions", async (req, res) => {
 
     await db.createQuestion(questionId, materialId, req.body);
 
-    const payload = await buildPayload();
+    const payload = await buildPayload(userId);
 
     res.json({
       ok: true,
@@ -202,18 +236,21 @@ router.post("/:materialId/questions", async (req, res) => {
 
 // ==================================================
 // PUT /api/materials/:materialId/questions/:questionId
-// 問題更新
+// 自分の問題セットだけ問題更新
 // ==================================================
 router.put("/:materialId/questions/:questionId", async (req, res) => {
   try {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     const { materialId, questionId } = req.params;
 
-    const list = await db.findQuestionListById(materialId);
+    const list = await db.findQuestionListByIdAndUserId(materialId, userId);
 
     if (!list) {
       return res.status(404).json({
         ok: false,
-        message: "問題セットが見つかりません"
+        message: "問題セットが見つからないか、管理権限がありません"
       });
     }
 
@@ -228,7 +265,7 @@ router.put("/:materialId/questions/:questionId", async (req, res) => {
 
     await db.updateQuestion(questionId, req.body);
 
-    const payload = await buildPayload();
+    const payload = await buildPayload(userId);
 
     res.json({
       ok: true,
@@ -246,11 +283,23 @@ router.put("/:materialId/questions/:questionId", async (req, res) => {
 
 // ==================================================
 // DELETE /api/materials/:materialId/questions/:questionId
-// 問題削除
+// 自分の問題セットだけ問題削除
 // ==================================================
 router.delete("/:materialId/questions/:questionId", async (req, res) => {
   try {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     const { materialId, questionId } = req.params;
+
+    const list = await db.findQuestionListByIdAndUserId(materialId, userId);
+
+    if (!list) {
+      return res.status(404).json({
+        ok: false,
+        message: "問題セットが見つからないか、管理権限がありません"
+      });
+    }
 
     const q = await db.findQuestionById(questionId);
 
@@ -263,7 +312,7 @@ router.delete("/:materialId/questions/:questionId", async (req, res) => {
 
     await db.deleteQuestion(questionId);
 
-    const payload = await buildPayload();
+    const payload = await buildPayload(userId);
 
     res.json({
       ok: true,

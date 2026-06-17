@@ -270,6 +270,58 @@ async function getAllQuestionLists() {
   return rows;
 }
 
+async function getQuestionListsByUserId(userId) {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      m.material_id,
+      m.user_id,
+      m.category_id,
+      m.material_name,
+      m.image_text,
+      m.is_shared,
+      m.created_at,
+      m.updated_at,
+      c.category_name
+    FROM materials m
+    LEFT JOIN categories c
+      ON m.category_id = c.category_id
+    WHERE m.user_id = ?
+    ORDER BY m.created_at DESC
+    `,
+    [userId]
+  );
+
+  return rows;
+}
+
+async function findQuestionListByIdAndUserId(materialId, userId) {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      m.material_id,
+      m.user_id,
+      m.category_id,
+      m.material_name,
+      m.image_text,
+      m.is_shared,
+      m.created_at,
+      m.updated_at,
+      c.category_name
+    FROM materials m
+    LEFT JOIN categories c
+      ON m.category_id = c.category_id
+    WHERE
+      m.material_id = ?
+      AND m.user_id = ?
+    LIMIT 1
+    `,
+    [materialId, userId]
+  );
+
+  return rows[0] || null;
+}
+
 async function findQuestionListById(materialId) {
   const [rows] = await pool.query(
     `
@@ -537,5 +589,8 @@ module.exports = {
   findQuestionById,
   createQuestion,
   updateQuestion,
-  deleteQuestion
+  deleteQuestion,
+
+  getQuestionListsByUserId,
+  findQuestionListByIdAndUserId,
 };
