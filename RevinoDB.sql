@@ -24,6 +24,12 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+ALTER TABLE users
+  ADD COLUMN point INT UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN battle_win_count INT UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN study_count INT UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN question_count INT UNSIGNED NOT NULL DEFAULT 0;
+
 -- ==================================================
 -- ユーザータグ
 -- 中間テーブルなし。
@@ -298,3 +304,4 @@ CREATE TABLE IF NOT EXISTS battle_history (
   INDEX idx_battle_history_room_id (room_id),
   INDEX idx_battle_history_created_at (created_at)
 );
+

@@ -478,6 +478,12 @@ async function createQuestion(questionId, materialId, body) {
       );
     }
 
+    const ownerUserId = await getMaterialOwnerUserId(materialId, conn);
+
+    if (ownerUserId) {
+      await addUserQuestionCount(ownerUserId, 1, conn);
+    }
+
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -554,14 +560,158 @@ async function updateQuestion(questionId, body) {
   return await findQuestionById(questionId);
 }
 
-async function deleteQuestion(questionId) {
+async function addUserQuestionCount(userId, amount = 1, conn = pool) {
+  const id = String(userId || "").trim();
+  const value = Number(amount || 0);
+
+  if (!id || !Number.isInteger(value) || value === 0) {
+    return null;
+  }
+
+  if (value > 0) {
+    await conn.query(
+      `
+      UPDATE users
+      SET
+        question_count = question_count + ?,
+        updated_at = NOW()
+      WHERE user_id = ?
+      `,
+      [
+        value,
+        id
+      ]
+    );
+  } else {
+    await conn.query(
+      `
+      UPDATE users
+      SET
+        question_count =
+          CASE
+            WHEN question_count >= ? THEN question_count - ?
+            ELSE 0
+          END,
+        updated_at = NOW()
+      WHERE user_id = ?
+      `,
+      [
+        Math.abs(value),
+        Math.abs(value),
+        id
+      ]
+    );
+  }
+
+  return true;
+}
+
+async function getMaterialOwnerUserId(materialId, conn = pool) {
+  const [rows] = await conn.query(
+    `
+    SELECT
+      user_id
+    FROM materials
+    WHERE material_id = ?
+    LIMIT 1
+    `,
+    [materialId]
+  );
+
+  return rows[0]?.user_id || null;
+}
+
+async function addUserBattleWinStats(userId, point = 30) {
+  const id = String(userId || "").trim();
+
+  if (!id) {
+    return null;
+  }
+
   await pool.query(
     `
-    DELETE FROM question
-    WHERE question_id = ?
+    UPDATE users
+    SET
+      point = point + ?,
+      battle_win_count = battle_win_count + 1,
+      study_count = study_count + 1,
+      updated_at = NOW()
+    WHERE user_id = ?
     `,
-    [questionId]
+    [
+      Number(point || 0),
+      id
+    ]
   );
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      user_id,
+      username,
+      point,
+      battle_win_count,
+      study_count,
+      question_count
+    FROM users
+    WHERE user_id = ?
+    LIMIT 1
+    `,
+    [id]
+  );
+
+  return rows[0] || null;
+}
+
+async function deleteQuestion(questionId) {
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const [rows] = await conn.query(
+      `
+      SELECT
+        q.question_id,
+        q.material_id,
+        m.user_id
+      FROM question q
+      INNER JOIN materials m
+        ON q.material_id = m.material_id
+      WHERE q.question_id = ?
+      LIMIT 1
+      `,
+      [questionId]
+    );
+
+    const target = rows[0];
+
+    if (!target) {
+      await conn.rollback();
+      return null;
+    }
+
+    await conn.query(
+      `
+      DELETE FROM question
+      WHERE question_id = ?
+      `,
+      [questionId]
+    );
+
+    if (target.user_id) {
+      await addUserQuestionCount(target.user_id, -1, conn);
+    }
+
+    await conn.commit();
+
+    return target;
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 module.exports = {
@@ -593,4 +743,8 @@ module.exports = {
 
   getQuestionListsByUserId,
   findQuestionListByIdAndUserId,
+
+  addUserQuestionCount,
+  getMaterialOwnerUserId,
+  addUserBattleWinStats,
 };

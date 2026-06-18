@@ -1,11 +1,13 @@
 const WebSocket = require("ws");
 const crypto = require("crypto");
+const db = require("../DB/dbRoutes");
 const battleHistoryRepository = require("./battleHistoryRepository");
 
 const {
   BATTLE_QUESTION_COUNT,
   getSubjectLabel,
-  buildBattleQuestions,
+  canUserBattleSubject,
+  buildBattleQuestionsForPlayers,
   toPublicQuestion
 } = require("./battleQuestionRepository");
 
@@ -115,11 +117,39 @@ async function handleJoin(player, data) {
   player.age = Number(data.age || 15);
   player.subject = data.subject || "math";
   player.avatar = data.avatar || "🐧";
-  player.userId = data.userId || player.id;
+  player.userId = String(data.userId || "").trim();
+
+  if (!player.userId) {
+    send(player.ws, "error", {
+      message: "ログインユーザーが確認できないため、対戦できません。"
+    });
+    return;
+  }
 
   if (!Number.isInteger(player.age) || player.age < 1 || player.age > 120) {
     send(player.ws, "error", {
       message: "年齢が正しくありません"
+    });
+    return;
+  }
+
+  const subjectLabel = getSubjectLabel(player.subject);
+
+  if (!subjectLabel) {
+    send(player.ws, "error", {
+      message: "教科が正しくありません。"
+    });
+    return;
+  }
+
+  const ownCheck = await canUserBattleSubject({
+    subject: player.subject,
+    userId: player.userId
+  });
+
+  if (!ownCheck.ok) {
+    send(player.ws, "error", {
+      message: `${subjectLabel}の問題をまだ持っていないため、対戦できません。資料アップロードから${subjectLabel}の問題を作成してください。`
     });
     return;
   }
@@ -132,7 +162,8 @@ async function handleJoin(player, data) {
     name: player.name,
     age: player.age,
     subject: player.subject,
-    subjectLabel: getSubjectLabel(player.subject)
+    subjectLabel,
+    ownQuestionCount: ownCheck.count
   });
 
   if (waiting && waiting.ws.readyState === WebSocket.OPEN && waiting.id !== player.id) {
@@ -144,21 +175,40 @@ async function handleJoin(player, data) {
   waitingPlayers.set(key, player);
 
   send(player.ws, "waiting", {
-    message: `${getSubjectLabel(player.subject)} / ${player.age}歳で相手を探しています。`
+    message: `${subjectLabel} / ${player.age}歳で相手を探しています。`
   });
 }
 
 async function createRoom(playerA, playerB) {
   const roomId = createId("room");
-  const questions = await buildBattleQuestions(playerA.subject);
 
-  if (questions.length < BATTLE_QUESTION_COUNT) {
+  const result = await buildBattleQuestionsForPlayers({
+    subject: playerA.subject,
+    playerAUserId: playerA.userId,
+    playerBUserId: playerB.userId
+  });
+
+  if (!result.ok) {
     send(playerA.ws, "error", {
-      message: `${getSubjectLabel(playerA.subject)}の対戦用問題が不足しています。5問以上登録してください。`
+      message: result.message || `${getSubjectLabel(playerA.subject)}の対戦用問題が不足しています。`
     });
 
     send(playerB.ws, "error", {
-      message: `${getSubjectLabel(playerA.subject)}の対戦用問題が不足しています。5問以上登録してください。`
+      message: result.message || `${getSubjectLabel(playerA.subject)}の対戦用問題が不足しています。`
+    });
+
+    return;
+  }
+
+  const questions = result.questions;
+
+  if (questions.length < BATTLE_QUESTION_COUNT) {
+    send(playerA.ws, "error", {
+      message: `${getSubjectLabel(playerA.subject)}の対戦用問題が5問未満のため、対戦できません。`
+    });
+
+    send(playerB.ws, "error", {
+      message: `${getSubjectLabel(playerA.subject)}の対戦用問題が5問未満のため、対戦できません。`
     });
 
     return;
@@ -396,6 +446,28 @@ async function saveRoomHistory(room) {
   await battleHistoryRepository.saveBattleHistory(records);
 }
 
+async function applyWinnerStats(room) {
+  const [playerA, playerB] = room.players;
+
+  const scoreA = room.scores[playerA.id] || 0;
+  const scoreB = room.scores[playerB.id] || 0;
+
+  if (scoreA === scoreB) {
+    return null;
+  }
+
+  const winner = scoreA > scoreB ? playerA : playerB;
+
+  if (!winner.userId) {
+    return null;
+  }
+
+  return await db.addUserBattleWinStats(
+    winner.userId,
+    BATTLE_POINT_WIN
+  );
+}
+
 async function finishRoom(room) {
   if (!room || room.finished) {
     return;
@@ -421,6 +493,12 @@ async function finishRoom(room) {
     await saveRoomHistory(room);
   } catch (err) {
     console.error("saveRoomHistory error:", err);
+  }
+
+  try {
+    await applyWinnerStats(room);
+  } catch (err) {
+    console.error("applyWinnerStats error:", err);
   }
 
   broadcast(room, "finished", {

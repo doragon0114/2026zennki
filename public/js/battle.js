@@ -201,9 +201,17 @@ async function runMatchmaking() {
 
     updateBattleMatchingStatus(`${BATTLE_SUBJECT_LABELS[subject]} / ${age}歳で相手を探しています。`);
 
+    const userId = S.user?.userId || S.user?.id;
+
+    if (!userId) {
+      alert("ログイン情報が確認できないため、対戦できません。");
+      navigate("battle-start");
+      return;
+    }
+
     sendBattleMessage({
       type: "join",
-      userId: S.user.userId || S.user.id || S.user.email || S.user.name,
+      userId,
       name: S.user.name || S.user.username || "ゲスト",
       age,
       subject,
