@@ -1076,5 +1076,9 @@ function handleBattleFinished(data) {
 
   battleHistoryLoaded = false;
 
+  if (typeof refreshMyPageUserFromServer === "function") {
+    refreshMyPageUserFromServer();
+  }
+
   navigate("battle-result", {});
 }

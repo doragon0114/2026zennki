@@ -9,6 +9,113 @@
      ・doLogout()        : サーバー側のセッション破棄 API を呼んでからリセットする
 ============================================================ */
 
+let myPageUserRefreshing = false;
+
+function numberValue(...values) {
+  for (const value of values) {
+    const n = Number(value);
+
+    if (Number.isFinite(n)) {
+      return n;
+    }
+  }
+
+  return 0;
+}
+
+async function refreshMyPageUserFromServer() {
+  if (myPageUserRefreshing) {
+    return false;
+  }
+
+  myPageUserRefreshing = true;
+
+  try {
+    const response = await fetch("/api/auth/me");
+    const data = await response.json();
+
+    if (!response.ok || !data.ok || !data.user) {
+      return false;
+    }
+
+    const avatar = getCurrentAvatar();
+
+    if (typeof applyAuthUser === "function") {
+      applyAuthUser(data.user);
+      S.user.avatar = avatar;
+      localStorage.setItem("revino_avatar", avatar);
+      save();
+    } else {
+      S.user = {
+        ...S.user,
+        ...data.user
+      };
+      save();
+    }
+
+    return true;
+  } catch {
+    return false;
+  } finally {
+    myPageUserRefreshing = false;
+  }
+}
+
+function updateMyPageStatsView() {
+  const point = numberValue(S.user?.point, S.user?.points);
+  const battleWinCount = numberValue(S.user?.battleWinCount, S.user?.wins);
+  const studyCount = numberValue(S.user?.studyCount, S.user?.totalStudied);
+  const questionCount = numberValue(S.user?.questionCount);
+
+  const pointEl = document.getElementById("mypage-point");
+  const winEl = document.getElementById("mypage-win-count");
+  const studyEl = document.getElementById("mypage-study-count");
+  const questionEl = document.getElementById("mypage-question-count");
+  const levelEl = document.getElementById("mypage-level");
+
+  if (pointEl) {
+    pointEl.textContent = point;
+  }
+
+  if (winEl) {
+    winEl.textContent = battleWinCount;
+  }
+
+  if (studyEl) {
+    studyEl.textContent = studyCount;
+  }
+
+  if (questionEl) {
+    questionEl.textContent = questionCount;
+  }
+
+  if (levelEl) {
+    levelEl.textContent = `Lv. ${getLevel(point)}`;
+  }
+}
+
+function refreshMyPageStatsLater() {
+  setTimeout(async () => {
+    const mypageRoot = document.getElementById("mypage-root");
+
+    if (!mypageRoot) {
+      return;
+    }
+
+    const updated = await refreshMyPageUserFromServer();
+
+    if (!updated) {
+      return;
+    }
+
+    // 取得中に別画面へ移動していたら何もしない
+    if (!document.getElementById("mypage-root")) {
+      return;
+    }
+
+    updateMyPageStatsView();
+  }, 0);
+}
 
 /* ============================================================
    マイページ画面
@@ -21,36 +128,44 @@ function renderMyPage() {
     return "";
   }
 
+  refreshMyPageStatsLater();
+
   const avatar = getCurrentAvatar();
   S.user.avatar = avatar;
 
-  const lv = getLevel(S.user.points || 0);
+  const point = numberValue(S.user.point, S.user.points);
+  const battleWinCount = numberValue(S.user.battleWinCount, S.user.wins);
+  const studyCount = numberValue(S.user.studyCount, S.user.totalStudied);
+  const questionCount = numberValue(S.user.questionCount);
+
+  const lv = getLevel(point);
 
   return `
+  <div id="mypage-root">
     <div class="mypage-hero">
       <span class="mypage-avatar">${getAvatarHTML(avatar, 72)}</span>
       <div class="mypage-name">${esc(S.user.name || S.user.username || "ユーザー")}</div>
       <div class="mypage-email">${esc(S.user.email || "")}</div>
 
-      <div style="display:inline-block;background:linear-gradient(135deg,#FFD44D,var(--gold));color:white;padding:4px 14px;border-radius:14px;font-size:13px;font-weight:900;margin-bottom:14px;box-shadow:var(--shadow-gold)">
+      <div id="mypage-level" style="display:inline-block;background:linear-gradient(135deg,#FFD44D,var(--gold));color:white;padding:4px 14px;border-radius:14px;font-size:13px;font-weight:900;margin-bottom:14px;box-shadow:var(--shadow-gold)">
         Lv. ${lv}
       </div>
 
       <div class="mypage-stats">
         <div class="mypage-stat">
-          <div class="mypage-stat-num">${S.user.points || 0}</div>
+          <div class="mypage-stat-num" id="mypage-point">${point}</div>
           <div class="mypage-stat-lbl">ポイント</div>
         </div>
         <div class="mypage-stat">
-          <div class="mypage-stat-num">${S.user.wins || 0}</div>
+          <div class="mypage-stat-num" id="mypage-win-count">${battleWinCount}</div>
           <div class="mypage-stat-lbl">対戦勝利</div>
         </div>
         <div class="mypage-stat">
-          <div class="mypage-stat-num">${S.user.totalStudied || 0}</div>
+          <div class="mypage-stat-num" id="mypage-study-count">${studyCount}</div>
           <div class="mypage-stat-lbl">学習回数</div>
         </div>
         <div class="mypage-stat">
-          <div class="mypage-stat-num">${S.questions.length}</div>
+          <div class="mypage-stat-num" id="mypage-question-count">${questionCount}</div>
           <div class="mypage-stat-lbl">問題数</div>
         </div>
       </div>
@@ -122,6 +237,7 @@ function renderMyPage() {
     </div>
 
     <div style="height:16px"></div>
+  </div>
   `;
 }
 
@@ -167,6 +283,11 @@ function applyProfileUser(user, avatar) {
   if (typeof applyAuthUser === "function") {
     applyAuthUser(user);
   } else {
+    const point = numberValue(user.point, user.points);
+    const battleWinCount = numberValue(user.battleWinCount, user.wins);
+    const studyCount = numberValue(user.studyCount, user.totalStudied);
+    const questionCount = numberValue(user.questionCount);
+
     S.user = {
       ...S.user,
       userId: user.userId,
@@ -174,7 +295,16 @@ function applyProfileUser(user, avatar) {
       username: user.username,
       email: user.email,
       profile: user.profile || "",
-      userTags: Array.isArray(user.userTags) ? user.userTags : []
+      userTags: Array.isArray(user.userTags) ? user.userTags : [],
+
+      point,
+      battleWinCount,
+      studyCount,
+      questionCount,
+
+      points: point,
+      wins: battleWinCount,
+      totalStudied: studyCount
     };
   }
 

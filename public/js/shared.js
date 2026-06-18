@@ -142,11 +142,6 @@ function load() {
   S.user      = JSON.parse(u);
   S.materials = JSON.parse(localStorage.getItem('pz_materials') || '[]');
   S.questions = JSON.parse(localStorage.getItem('pz_questions')  || '[]');
-  if (S.materials.length === 0) {
-    S.materials = [SAMPLE_MATERIAL];
-    S.questions = SAMPLE_QUESTIONS.map(q => ({...q}));
-    save();
-  }
   return true;
 }
 
