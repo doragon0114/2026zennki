@@ -577,46 +577,170 @@ async function saveProfile() {
    自分のポイントに応じてランキングに自分を挿入し、上位3名を表彰台で表示する
    TODO（DB担当者へ）: MOCK_RANKINGS の代わりにサーバーからランキングデータを取得する
 ============================================================ */
-function renderRanking() {
-  const all = [...MOCK_RANKINGS];
-  const insertAt = all.findIndex(u=>u.points<S.user.points);
-  const me = { id:'me', name:S.user.name+' (あなた)', avatar:S.user.avatar, points:S.user.points, wins:S.user.wins, isMe:true };
-  all.splice(insertAt===-1?all.length:insertAt, 0, me);
+let rankingLoaded = false;
+let rankingLoading = false;
+let rankingUsers = [];
 
-  const top3 = all.slice(0,3);
-  const rest  = all.slice(3);
-  const podiumOrder=[{i:1,cls:'second'},{i:0,cls:'first'},{i:2,cls:'third'}];
-  const medals=['1','2','3'];
-  const podiumH=['70px','54px','42px'];
-  const po = podiumOrder.filter(p=>top3[p.i]).map(p=>{
-    const u=top3[p.i];
-    const h=p.cls==='first'?podiumH[0]:p.cls==='second'?podiumH[1]:podiumH[2];
+function getRankingPoint(user) {
+  return numberValue(user.point, user.points);
+}
+
+function getRankingWins(user) {
+  return numberValue(user.battleWinCount, user.wins);
+}
+
+async function loadRankingFromServer(force = false) {
+  if (rankingLoading) {
+    return;
+  }
+
+  if (rankingLoaded && !force) {
+    return;
+  }
+
+  rankingLoading = true;
+
+  try {
+    const userId = encodeURIComponent(S.user?.userId || S.user?.id || "");
+    const response = await fetch(`/api/calendar/ranking?userId=${userId}&limit=50`);
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "ランキング取得に失敗しました");
+    }
+
+    rankingUsers = Array.isArray(data.rankings) ? data.rankings : [];
+    rankingLoaded = true;
+
+    const rankingRoot = document.getElementById("ranking-root");
+
+    if (rankingRoot) {
+      rankingRoot.innerHTML = renderRankingContent();
+    }
+  } catch (err) {
+    const rankingRoot = document.getElementById("ranking-root");
+
+    if (rankingRoot) {
+      rankingRoot.innerHTML = `
+        <div style="text-align:center;padding:60px 20px;color:var(--gray)">
+          <div class="empty-icon-wrap">${svg(IC.inbox,48)}</div>
+          <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
+            ランキングを取得できませんでした
+          </div>
+          <button class="btn btn-primary mt16" onclick="loadRankingFromServer(true)">
+            再読み込み
+          </button>
+        </div>
+      `;
+    }
+  } finally {
+    rankingLoading = false;
+  }
+}
+
+function renderRankingContent() {
+  const all = rankingUsers.map(user => ({
+    id: user.userId,
+    name: user.name || user.username || "ユーザー",
+    avatar: user.avatar || "🐧",
+    points: getRankingPoint(user),
+    wins: getRankingWins(user),
+    rank: Number(user.rank || 0),
+    isMe: Boolean(user.isMe)
+  }));
+
+  if (all.length === 0) {
+    return `
+      <div style="text-align:center;padding:60px 20px;color:var(--gray)">
+        <div class="empty-icon-wrap">${svg(IC.inbox,48)}</div>
+        <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
+          ランキングデータがありません
+        </div>
+      </div>
+    `;
+  }
+
+  const top3 = all.slice(0, 3);
+  const podiumOrder = [
+    { i: 1, cls: "second" },
+    { i: 0, cls: "first" },
+    { i: 2, cls: "third" }
+  ];
+  const medals = ["1", "2", "3"];
+  const podiumH = ["70px", "54px", "42px"];
+
+  const po = podiumOrder.filter(p => top3[p.i]).map(p => {
+    const u = top3[p.i];
+    const h = p.cls === "first" ? podiumH[0] : p.cls === "second" ? podiumH[1] : podiumH[2];
+
     return `
       <div class="rank-podium">
         <div class="rank-podium-avatar">${getAvatarHTML(u.avatar,44)}</div>
-        <div class="rank-podium-name">${esc(u.name.replace(' (あなた)',''))}</div>
+        <div class="rank-podium-name">${esc(u.name.replace(" (あなた)", ""))}</div>
         <div class="rank-podium-pts">${u.points}pt</div>
-        <div class="rank-podium-box ${p.cls}" style="height:${h}">${medals[['first','second','third'].indexOf(p.cls)]}</div>
+        <div class="rank-podium-box ${p.cls}" style="height:${h}">
+          ${medals[["first","second","third"].indexOf(p.cls)]}
+        </div>
       </div>`;
-  }).join('');
+  }).join("");
 
-  const rows = all.map((u,i)=>`
-    <div class="rank-item ${u.isMe?'me':''}">
-      <div class="rank-num">${i+1}</div>
+  const rows = all.map((u, i) => `
+    <div class="rank-item ${u.isMe ? "me" : ""}">
+      <div class="rank-num">${u.rank || i + 1}</div>
       <div class="rank-avatar-icon">${getAvatarHTML(u.avatar,36)}</div>
       <div class="rank-info">
-        <div class="rank-name">${esc(u.name)}</div>
+        <div class="rank-name">${esc(u.name)}${u.isMe && !u.name.includes("あなた") ? " (あなた)" : ""}</div>
         <div class="rank-wins">${svg(IC.swords,12)} 勝利 ${u.wins}回</div>
       </div>
       <div class="rank-pts">${u.points}pt</div>
-    </div>`).join('');
+    </div>
+  `).join("");
 
   return `
     <div class="ranking-hero">
-      <div class="ranking-hero-icon"><img src="trophy.png" alt="trophy" class="ranking-trophy-img"></div>
+      <div class="ranking-hero-icon">
+        <img src="trophy.png" alt="trophy" class="ranking-trophy-img">
+      </div>
       <div class="ranking-hero-title">ランキング</div>
-      <div class="ranking-hero-sub">学校内で1位を目指そう！</div>
+      <div class="ranking-hero-sub">ポイント数でランキング！</div>
     </div>
+
     <div class="ranking-top3">${po}</div>
-    <div class="rank-list">${rows}</div>`;
+    <div class="rank-list">${rows}</div>
+  `;
+}
+
+function renderRanking() {
+  if (!S.user) {
+    setTimeout(() => navigate("login"), 0);
+    return "";
+  }
+
+  setTimeout(() => {
+    loadRankingFromServer(true);
+  }, 0);
+
+  return `
+    <div id="ranking-root">
+      ${rankingLoaded
+        ? renderRankingContent()
+        : `
+          <div class="ranking-hero">
+            <div class="ranking-hero-icon">
+              <img src="trophy.png" alt="trophy" class="ranking-trophy-img">
+            </div>
+            <div class="ranking-hero-title">ランキング</div>
+            <div class="ranking-hero-sub">読み込み中...</div>
+          </div>
+
+          <div style="text-align:center;padding:60px 20px;color:var(--gray)">
+            <div class="empty-icon-wrap">${svg(IC.inbox,48)}</div>
+            <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
+              ランキングを取得しています
+            </div>
+          </div>
+        `
+      }
+    </div>
+  `;
 }
