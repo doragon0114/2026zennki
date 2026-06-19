@@ -1,6 +1,7 @@
 const WebSocket = require("ws");
 const crypto = require("crypto");
 const db = require("../DB/dbRoutes");
+const calendarService = require("../calendar/calendarService");
 const battleHistoryRepository = require("./battleHistoryRepository");
 
 const {
@@ -468,6 +469,49 @@ async function applyWinnerStats(room) {
   );
 }
 
+async function recordBattleCalendarActivity(room) {
+  if (!room || !Array.isArray(room.players)) {
+    return;
+  }
+
+  const [playerA, playerB] = room.players;
+
+  if (!playerA || !playerB) {
+    return;
+  }
+
+  const scoreA = room.scores[playerA.id] || 0;
+  const scoreB = room.scores[playerB.id] || 0;
+
+  let winnerUserId = null;
+
+  if (scoreA > scoreB) {
+    winnerUserId = playerA.userId;
+  } else if (scoreB > scoreA) {
+    winnerUserId = playerB.userId;
+  }
+
+  await Promise.all(
+    room.players.map(player => {
+      if (!player.userId) {
+        return Promise.resolve(null);
+      }
+
+      const points =
+        winnerUserId && String(player.userId) === String(winnerUserId)
+          ? BATTLE_POINT_WIN
+          : 0;
+
+      return calendarService.recordActivity({
+        userId: player.userId,
+        type: "battle",
+        sourceId: room.id,
+        points
+      });
+    })
+  );
+}
+
 async function finishRoom(room) {
   if (!room || room.finished) {
     return;
@@ -490,15 +534,15 @@ async function finishRoom(room) {
   }
 
   try {
-    await saveRoomHistory(room);
-  } catch (err) {
-    console.error("saveRoomHistory error:", err);
-  }
-
-  try {
     await applyWinnerStats(room);
   } catch (err) {
     console.error("applyWinnerStats error:", err);
+  }
+
+  try {
+    await recordBattleCalendarActivity(room);
+  } catch (err) {
+    console.error("recordBattleCalendarActivity error:", err);
   }
 
   broadcast(room, "finished", {

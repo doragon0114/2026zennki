@@ -1080,5 +1080,13 @@ function handleBattleFinished(data) {
     refreshMyPageUserFromServer();
   }
 
+  if (typeof markHomeCalendarDirty === "function") {
+    markHomeCalendarDirty();
+  }
+
+  if (typeof loadHomeCalendarFromServer === "function") {
+    loadHomeCalendarFromServer(true);
+  }
+
   navigate("battle-result", {});
 }

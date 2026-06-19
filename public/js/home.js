@@ -121,8 +121,9 @@ async function loadHomeCalendarFromServer(force = false) {
     homeCalendarLoaded = true;
 
     const calendarEl = document.getElementById("home-calendar-card");
-    if (calendarEl) {
-      navigate("home");
+
+    if (calendarEl && isHomeScreenVisible()) {
+      calendarEl.outerHTML = renderHomeCalendar();
     }
   } catch {
     homeCalendarSummary = null;
@@ -133,6 +134,17 @@ async function loadHomeCalendarFromServer(force = false) {
 
 function markHomeCalendarDirty() {
   homeCalendarLoaded = false;
+  homeCalendarSummary = null;
+
+  if (isHomeScreenVisible()) {
+    refreshHomeCalendarLater(true);
+  }
+}
+
+function refreshHomeCalendarLater(force = false) {
+  setTimeout(() => {
+    loadHomeCalendarFromServer(force);
+  }, 0);
 }
 
 /* 学習カレンダーカードを生成する（今日を含む直近7日間を表示） */
@@ -225,6 +237,7 @@ function renderHomeCalendar() {
 /* ホーム画面本体 */
 function renderHome() {
   refreshHomeMaterialsLater();
+  refreshHomeCalendarLater(true);
 
   const point = Number(S.user.point ?? S.user.points ?? 0);
   const lv = getLevel(point);

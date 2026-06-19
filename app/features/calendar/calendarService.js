@@ -1,9 +1,4 @@
-const crypto = require("crypto");
 const calendarRepository = require("./calendarRepository");
-
-function createId(prefix) {
-  return `${prefix}_${crypto.randomBytes(6).toString("hex")}`;
-}
 
 function toDateKey(date) {
   const d = new Date(date);
@@ -16,6 +11,7 @@ function toDateKey(date) {
 
 function getDateLabel(dateKey) {
   const d = new Date(`${dateKey}T00:00:00`);
+
   return {
     dateKey,
     day: d.getDate(),
@@ -51,11 +47,12 @@ function calculateStreak(studiedDateSet) {
   return streak;
 }
 
-function getCalendarSummary(userId) {
-  const activities = calendarRepository.getActivitiesByUserId(userId);
-  const studiedDateSet = new Set(activities.map(activity => activity.dateKey));
+async function getCalendarSummary(userId) {
+  const dateKeys = await calendarRepository.getActivityDateKeysByUserId(userId);
+  const studiedDateSet = new Set(dateKeys);
 
   const weekKeys = getLastNDays(7);
+
   const days = weekKeys.map(dateKey => ({
     ...getDateLabel(dateKey),
     studied: studiedDateSet.has(dateKey),
@@ -74,28 +71,36 @@ function getCalendarSummary(userId) {
   };
 }
 
-function recordActivity({ userId, type = "study", sourceId = null, points = 0 }) {
+async function recordActivity({
+  userId,
+  type = "study",
+  sourceId = null,
+  points = 0
+}) {
   if (!userId) {
     return null;
   }
 
-  const now = new Date();
-  const dateKey = toDateKey(now);
-
-  const activity = {
-    id: createId("cal"),
+  return await calendarRepository.addActivity({
     userId,
     type,
     sourceId,
-    points,
-    dateKey,
-    createdAt: now.toISOString()
-  };
+    points
+  });
+}
 
-  return calendarRepository.addActivity(activity);
+async function getRanking({
+  userId = null,
+  limit = 50
+} = {}) {
+  return await calendarRepository.getRankingByPoint({
+    userId,
+    limit
+  });
 }
 
 module.exports = {
   getCalendarSummary,
-  recordActivity
+  recordActivity,
+  getRanking
 };
