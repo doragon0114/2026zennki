@@ -24,6 +24,12 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+ALTER TABLE users
+  ADD COLUMN point INT UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN battle_win_count INT UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN study_count INT UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN question_count INT UNSIGNED NOT NULL DEFAULT 0;
+
 -- ==================================================
 -- ユーザータグ
 -- 中間テーブルなし。
@@ -298,3 +304,37 @@ CREATE TABLE IF NOT EXISTS battle_history (
   INDEX idx_battle_history_room_id (room_id),
   INDEX idx_battle_history_created_at (created_at)
 );
+
+-- ============================================================
+-- 学習カレンダー
+-- ユーザーごと・日付ごとに学習した日を管理する
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `calendar` (
+  calendar_id VARCHAR(120) PRIMARY KEY,
+  user_id VARCHAR(80) NOT NULL,
+  activity_date DATE NOT NULL,
+
+  study_count INT UNSIGNED NOT NULL DEFAULT 0,
+  battle_count INT UNSIGNED NOT NULL DEFAULT 0,
+  total_points INT UNSIGNED NOT NULL DEFAULT 0,
+
+  last_type VARCHAR(30),
+  last_source_id VARCHAR(120),
+
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL
+    DEFAULT CURRENT_TIMESTAMP
+    ON UPDATE CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_calendar_user
+    FOREIGN KEY (user_id)
+    REFERENCES users(user_id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE,
+
+  UNIQUE KEY uq_calendar_user_date (user_id, activity_date),
+  INDEX idx_calendar_user_id (user_id),
+  INDEX idx_calendar_activity_date (activity_date)
+);
+

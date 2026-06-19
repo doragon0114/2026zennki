@@ -16,6 +16,11 @@ function applyAuthUser(user) {
     return;
   }
 
+  const point = Number(user.point ?? user.points ?? 0);
+  const battleWinCount = Number(user.battleWinCount ?? user.wins ?? 0);
+  const studyCount = Number(user.studyCount ?? user.totalStudied ?? 0);
+  const questionCount = Number(user.questionCount ?? 0);
+
   S.user = {
     userId: user.userId,
     name: user.username,
@@ -24,18 +29,28 @@ function applyAuthUser(user) {
     profile: user.profile || "",
     userTags: Array.isArray(user.userTags) ? user.userTags : [],
     avatar: localStorage.getItem("revino_avatar") || user.avatar || "🐧",
-    points: user.points || 0,
-    wins: user.wins || 0,
-    totalStudied: user.totalStudied || 0,
+
+    point,
+    battleWinCount,
+    studyCount,
+    questionCount,
+
+    points: point,
+    wins: battleWinCount,
+    totalStudied: studyCount,
+
     createdAt: user.createdAt
   };
 
-  if (!Array.isArray(S.materials) || S.materials.length === 0) {
-    S.materials = [SAMPLE_MATERIAL];
+  S.materials = [];
+  S.questions = [];
+
+  if (typeof studyLoaded !== "undefined") {
+    studyLoaded = false;
   }
 
-  if (!Array.isArray(S.questions) || S.questions.length === 0) {
-    S.questions = SAMPLE_QUESTIONS.map(q => ({ ...q }));
+  if (typeof materialsLoaded !== "undefined") {
+    materialsLoaded = false;
   }
 
   save();

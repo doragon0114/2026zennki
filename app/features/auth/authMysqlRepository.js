@@ -198,12 +198,29 @@ async function toPublicUser(userRow) {
 
   const userTags = await getUserTagsByUserId(userRow.userId);
 
+  const point = Number(userRow.point || 0);
+  const battleWinCount = Number(userRow.battleWinCount || 0);
+  const studyCount = Number(userRow.studyCount || 0);
+  const questionCount = Number(userRow.questionCount || 0);
+
   return {
     userId: userRow.userId,
     username: userRow.username,
     profile: userRow.profile || "",
     userTags,
     email: userRow.email,
+
+    // DBカラム名に近い形
+    point,
+    battleWinCount,
+    studyCount,
+    questionCount,
+
+    // フロント既存コード互換
+    points: point,
+    wins: battleWinCount,
+    totalStudied: studyCount,
+
     createdAt: userRow.createdAt
   };
 }
@@ -309,10 +326,14 @@ async function loginUser({ loginId, password }) {
       email,
       password_hash AS passwordHash,
       salt,
+      point,
+      battle_win_count AS battleWinCount,
+      study_count AS studyCount,
+      question_count AS questionCount,
       created_at AS createdAt
     FROM users
     WHERE user_id = ?
-       OR LOWER(email) = ?
+      OR LOWER(email) = ?
     LIMIT 1
     `,
     [
@@ -348,6 +369,10 @@ async function findPublicUserByUserId(userId) {
       username,
       profile,
       email,
+      point,
+      battle_win_count AS battleWinCount,
+      study_count AS studyCount,
+      question_count AS questionCount,
       created_at AS createdAt
     FROM users
     WHERE user_id = ?

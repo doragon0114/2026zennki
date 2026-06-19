@@ -7,14 +7,11 @@ const BATTLE_SUBJECTS = {
   math: "数学",
   english: "英語",
   science: "理科",
-  social: "社会",
-  basic_info: "基本情報",
-  classical_japanese: "古典",
-  general: "一般"
+  social: "社会"
 };
 
 function getSubjectLabel(subject) {
-  return BATTLE_SUBJECTS[subject] || subject || "未分類";
+  return BATTLE_SUBJECTS[subject] || null;
 }
 
 function labelToIndex(label) {
@@ -24,8 +21,106 @@ function labelToIndex(label) {
   return index >= 0 ? index : 0;
 }
 
-async function fetchRandomQuestionRows(subject) {
+function normalizeUserIds(userIds) {
+  return [...new Set(
+    (Array.isArray(userIds) ? userIds : [])
+      .map(userId => String(userId || "").trim())
+      .filter(Boolean)
+  )];
+}
+
+async function countBattleQuestionsByUser({ subject, userId }) {
   const subjectLabel = getSubjectLabel(subject);
+
+  if (!subjectLabel || !userId) {
+    return 0;
+  }
+
+  const [rows] = await db.query(
+    `
+    SELECT
+      COUNT(*) AS question_count
+    FROM (
+      SELECT
+        q.question_id
+      FROM question q
+      INNER JOIN materials m
+        ON q.material_id = m.material_id
+      INNER JOIN categories c
+        ON m.category_id = c.category_id
+      INNER JOIN question_choices qc
+        ON q.question_id = qc.question_id
+      WHERE
+        c.category_name = ?
+        AND m.user_id = ?
+      GROUP BY
+        q.question_id
+      HAVING
+        COUNT(qc.choice_id) >= 4
+        AND SUM(CASE WHEN qc.is_correct = 1 THEN 1 ELSE 0 END) >= 1
+    ) valid_questions
+    `,
+    [
+      subjectLabel,
+      userId
+    ]
+  );
+
+  return Number(rows[0]?.question_count || 0);
+}
+
+async function countBattleQuestionsByUsers({ subject, userIds }) {
+  const ids = normalizeUserIds(userIds);
+  const subjectLabel = getSubjectLabel(subject);
+
+  if (!subjectLabel || ids.length === 0) {
+    return 0;
+  }
+
+  const placeholders = ids.map(() => "?").join(",");
+
+  const [rows] = await db.query(
+    `
+    SELECT
+      COUNT(*) AS question_count
+    FROM (
+      SELECT
+        q.question_id
+      FROM question q
+      INNER JOIN materials m
+        ON q.material_id = m.material_id
+      INNER JOIN categories c
+        ON m.category_id = c.category_id
+      INNER JOIN question_choices qc
+        ON q.question_id = qc.question_id
+      WHERE
+        c.category_name = ?
+        AND m.user_id IN (${placeholders})
+      GROUP BY
+        q.question_id
+      HAVING
+        COUNT(qc.choice_id) >= 4
+        AND SUM(CASE WHEN qc.is_correct = 1 THEN 1 ELSE 0 END) >= 1
+    ) valid_questions
+    `,
+    [
+      subjectLabel,
+      ...ids
+    ]
+  );
+
+  return Number(rows[0]?.question_count || 0);
+}
+
+async function fetchRandomQuestionRows({ subject, userIds }) {
+  const ids = normalizeUserIds(userIds);
+  const subjectLabel = getSubjectLabel(subject);
+
+  if (!subjectLabel || ids.length === 0) {
+    return [];
+  }
+
+  const placeholders = ids.map(() => "?").join(",");
 
   const [rows] = await db.query(
     `
@@ -34,6 +129,7 @@ async function fetchRandomQuestionRows(subject) {
       q.question_text AS text,
       q.explanation AS explanation,
       q.material_id AS materialId,
+      m.user_id AS ownerUserId,
       c.category_id AS categoryId,
       c.category_name AS categoryName
     FROM question q
@@ -43,12 +139,15 @@ async function fetchRandomQuestionRows(subject) {
       ON m.category_id = c.category_id
     INNER JOIN question_choices qc
       ON q.question_id = qc.question_id
-    WHERE c.category_name = ?
+    WHERE
+      c.category_name = ?
+      AND m.user_id IN (${placeholders})
     GROUP BY
       q.question_id,
       q.question_text,
       q.explanation,
       q.material_id,
+      m.user_id,
       c.category_id,
       c.category_name
     HAVING
@@ -59,6 +158,7 @@ async function fetchRandomQuestionRows(subject) {
     `,
     [
       subjectLabel,
+      ...ids,
       BATTLE_QUESTION_COUNT
     ]
   );
@@ -71,6 +171,8 @@ async function fetchChoicesByQuestionIds(questionIds) {
     return [];
   }
 
+  const placeholders = questionIds.map(() => "?").join(",");
+
   const [rows] = await db.query(
     `
     SELECT
@@ -80,24 +182,104 @@ async function fetchChoicesByQuestionIds(questionIds) {
       choice_text AS choiceText,
       is_correct AS isCorrect
     FROM question_choices
-    WHERE question_id IN (?)
+    WHERE question_id IN (${placeholders})
     ORDER BY
       question_id ASC,
       FIELD(choice_label, 'A', 'B', 'C', 'D'),
       choice_label ASC,
       choice_id ASC
     `,
-    [questionIds]
+    questionIds
   );
 
   return rows;
 }
 
-async function buildBattleQuestions(subject) {
-  const questionRows = await fetchRandomQuestionRows(subject);
+async function canUserBattleSubject({ subject, userId }) {
+  const count = await countBattleQuestionsByUser({
+    subject,
+    userId
+  });
+
+  return {
+    ok: count > 0,
+    count,
+    subjectLabel: getSubjectLabel(subject)
+  };
+}
+
+async function buildBattleQuestionsForPlayers({ subject, playerAUserId, playerBUserId }) {
+  const subjectLabel = getSubjectLabel(subject);
+
+  if (!subjectLabel) {
+    return {
+      ok: false,
+      reason: "invalid_subject",
+      message: "教科が正しくありません。",
+      questions: []
+    };
+  }
+
+  const playerACount = await countBattleQuestionsByUser({
+    subject,
+    userId: playerAUserId
+  });
+
+  if (playerACount <= 0) {
+    return {
+      ok: false,
+      reason: "player_a_no_questions",
+      message: `プレイヤーAが${subjectLabel}の問題を持っていないため、対戦できません。`,
+      questions: []
+    };
+  }
+
+  const playerBCount = await countBattleQuestionsByUser({
+    subject,
+    userId: playerBUserId
+  });
+
+  if (playerBCount <= 0) {
+    return {
+      ok: false,
+      reason: "player_b_no_questions",
+      message: `プレイヤーBが${subjectLabel}の問題を持っていないため、対戦できません。`,
+      questions: []
+    };
+  }
+
+  const totalCount = await countBattleQuestionsByUsers({
+    subject,
+    userIds: [
+      playerAUserId,
+      playerBUserId
+    ]
+  });
+
+  if (totalCount < BATTLE_QUESTION_COUNT) {
+    return {
+      ok: false,
+      reason: "not_enough_total_questions",
+      message: `${subjectLabel}の問題が2人合わせて${BATTLE_QUESTION_COUNT}問未満のため、対戦できません。`,
+      questions: []
+    };
+  }
+
+  const questionRows = await fetchRandomQuestionRows({
+    subject,
+    userIds: [
+      playerAUserId,
+      playerBUserId
+    ]
+  });
 
   if (questionRows.length < BATTLE_QUESTION_COUNT) {
-    return [];
+    return {
+      ok: false,
+      reason: "not_enough_random_questions",
+      message: `${subjectLabel}の対戦用問題が不足しています。`,
+      questions: []
+    };
   }
 
   const questionIds = questionRows.map(question => question.id);
@@ -136,9 +318,10 @@ async function buildBattleQuestions(subject) {
       id: question.id,
       number: questions.length + 1,
       materialId: question.materialId,
+      ownerUserId: question.ownerUserId,
       categoryId: question.categoryId,
       subject,
-      subjectLabel: getSubjectLabel(subject),
+      subjectLabel,
       categoryName: question.categoryName,
       text: question.text,
       choices: firstFourChoices.map(choice => choice.choiceText),
@@ -148,10 +331,20 @@ async function buildBattleQuestions(subject) {
   }
 
   if (questions.length < BATTLE_QUESTION_COUNT) {
-    return [];
+    return {
+      ok: false,
+      reason: "not_enough_valid_questions",
+      message: `${subjectLabel}の有効な対戦用問題が不足しています。`,
+      questions: []
+    };
   }
 
-  return questions.slice(0, BATTLE_QUESTION_COUNT);
+  return {
+    ok: true,
+    reason: "ok",
+    message: "",
+    questions: questions.slice(0, BATTLE_QUESTION_COUNT)
+  };
 }
 
 function toPublicQuestion(question) {
@@ -167,6 +360,7 @@ module.exports = {
   BATTLE_QUESTION_COUNT,
   BATTLE_SUBJECTS,
   getSubjectLabel,
-  buildBattleQuestions,
+  canUserBattleSubject,
+  buildBattleQuestionsForPlayers,
   toPublicQuestion
 };

@@ -2,11 +2,6 @@
    study.js — 個人学習（問題集選択・問題回答・結果）画面
    ─────────────────────────────────────────────────────────────
    担当: フロントエンド担当
-
-   TODO（DB担当者へ）:
-     ・finishStudy(): 学習結果をサーバーに保存する
-       現在は S.user.totalStudied++ → save() だけだが、
-       本番では API 経由でユーザーの学習履歴をサーバー保存する
 ============================================================ */
 
 let studyLoaded = false;
@@ -20,7 +15,8 @@ async function loadStudyDataFromServer() {
   studyLoading = true;
 
   try {
-    const response = await fetch("/api/study/bootstrap");
+    const userId = encodeURIComponent(S.user?.userId || S.user?.id || "");
+    const response = await fetch(`/api/study/bootstrap?userId=${userId}`);
     const data = await response.json();
 
     if (!response.ok || !data.ok) {
@@ -62,22 +58,51 @@ async function loadStudyDataFromServer() {
 
 async function saveStudyResultToServer(resultPayload) {
   try {
+    const userId = S.user?.userId || S.user?.id || "";
+
     const response = await fetch("/api/study/results", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(resultPayload)
+      body: JSON.stringify({
+        ...resultPayload,
+        userId
+      })
     });
 
     const data = await response.json();
 
     if (!response.ok || !data.ok) {
+      console.error("saveStudyResultToServer error:", data);
       return null;
     }
 
+    if (data.user) {
+      const point = Number(data.user.point ?? data.user.points ?? 0);
+      const battleWinCount = Number(data.user.battleWinCount ?? data.user.wins ?? 0);
+      const studyCount = Number(data.user.studyCount ?? data.user.totalStudied ?? 0);
+      const questionCount = Number(data.user.questionCount ?? 0);
+
+      S.user = {
+        ...S.user,
+
+        point,
+        battleWinCount,
+        studyCount,
+        questionCount,
+
+        points: point,
+        wins: battleWinCount,
+        totalStudied: studyCount
+      };
+
+      save();
+    }
+
     return data.result;
-  } catch {
+  } catch (err) {
+    console.error("saveStudyResultToServer catch:", err);
     return null;
   }
 }
@@ -347,10 +372,6 @@ async function finishStudy() {
   const correct = answers.filter(answer => answer.correct).length;
   const pointsGained = correct * 10;
 
-  S.user.totalStudied = Number(S.user.totalStudied || 0) + 1;
-  S.user.points = Number(S.user.points || 0) + pointsGained;
-  save();
-
   const resultPayload = {
     answers,
     questions: sess.questions,
@@ -358,17 +379,27 @@ async function finishStudy() {
     finishedAt: new Date().toISOString()
   };
 
-  await saveStudyResultToServer(resultPayload);
+  const savedResult = await saveStudyResultToServer(resultPayload);
+  const resultId = savedResult?.id || null;
+
+  if (S.studySession) {
+    S.studySession.resultId = resultId;
+  }
 
   await recordCalendarActivity({
     type: "study",
-    sourceId: "study",
+    sourceId: resultId || "study",
     points: pointsGained
   });
 
+  if (typeof refreshMyPageUserFromServer === "function") {
+    refreshMyPageUserFromServer();
+  }
+
   navigate("result", {
     answers,
-    questions: sess.questions
+    questions: sess.questions,
+    resultId
   });
 }
 
@@ -407,6 +438,7 @@ async function recordCalendarActivity(payload = {}) {
 function renderResult(params = {}) {
   const answers = Array.isArray(params.answers) ? params.answers : [];
   const questions = Array.isArray(params.questions) ? params.questions : [];
+  const resultId = params.resultId || S.studySession?.resultId || "";
 
   if (!answers.length || !questions.length) {
     return `
@@ -464,16 +496,53 @@ function renderResult(params = {}) {
       <div class="section-heading-icon">${svg(IC.bookOpen,16)} 解説・振り返り</div>
       ${reviews}
       <div class="flex-row mt16">
-        <button class="btn btn-outline" onclick="retryWrong()">✗ 解き直す</button>
+        <button class="btn btn-outline" onclick="retryWrong('${esc(resultId)}')">✗ 解き直す</button>
         <button class="btn btn-primary" onclick="navigate('question-set')">次の問題へ</button>
       </div>
     </div>`;
 }
 
 /* 間違えた問題だけを再学習する */
-function retryWrong() {
-  const sess = S.studySession; if(!sess) { navigate('question-set'); return; }
-  const wrong = sess.answers.filter(a=>!a.correct).map(a=>a.questionId);
-  if (!wrong.length) { alert('間違えた問題はありません！完璧です！'); return; }
-  startStudy(wrong);
+async function retryWrong(resultId) {
+  const rid = resultId || S.studySession?.resultId;
+
+  if (!rid) {
+    alert("解き直し用の結果IDがありません。");
+    return;
+  }
+
+  try {
+    const userId = encodeURIComponent(S.user?.userId || S.user?.id || "");
+    const response = await fetch(`/api/study/results/${encodeURIComponent(rid)}/wrong?userId=${userId}`);
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      alert(data.message || "間違えた問題を取得できませんでした。");
+      return;
+    }
+
+    const wrongQuestions = Array.isArray(data.questions) ? data.questions : [];
+
+    if (wrongQuestions.length === 0) {
+      alert("間違えた問題はありません！完璧です！");
+      return;
+    }
+
+    S.studySession = {
+      questions: shuffle(wrongQuestions),
+      current: 0,
+      answers: [],
+      startTime: Date.now(),
+      startedAt: new Date().toISOString(),
+      retryFromResultId: rid
+    };
+
+    navigate("question", {
+      mode: "study",
+      retry: true
+    });
+  } catch (err) {
+    console.error("retryWrong error:", err);
+    alert("通信エラーが発生しました。");
+  }
 }
