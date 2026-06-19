@@ -45,6 +45,10 @@ function applyAuthUser(user) {
   S.materials = [];
   S.questions = [];
 
+  if (typeof studyLoaded !== "undefined") {
+    studyLoaded = false;
+  }
+
   if (typeof materialsLoaded !== "undefined") {
     materialsLoaded = false;
   }
