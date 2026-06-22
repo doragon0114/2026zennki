@@ -224,8 +224,8 @@ const AVATAR_COLORS = {
 
 function getAvatarHTML(emoji, size=40) {
   const av = AVATAR_COLORS[emoji] || { c:'#3B82F6', bg:'#DBEAFE' };
-  const is = Math.round(size * 0.48);
-  return `<div class="avatar-circle" style="width:${size}px;height:${size}px;background:${av.bg};color:${av.c};">${svg(IC.user, is)}</div>`;
+  const fs = Math.round(size * 0.55);
+  return `<div class="avatar-circle" style="width:${size}px;height:${size}px;background:${av.bg};color:${av.c};font-size:${fs}px;display:flex;align-items:center;justify-content:center;">${emoji}</div>`;
 }
 
 
