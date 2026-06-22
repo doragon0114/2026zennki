@@ -255,9 +255,21 @@ async function loadBattleHistoryFromServer(force = false) {
   battleHistoryLoading = true;
 
   try {
-    const userId = encodeURIComponent(S.user.userId || S.user.id || S.user.email || S.user.name || "");
+    const rawUserId = S.user?.userId || S.user?.id || "";
 
-    const response = await fetch(`/api/battle/history?userId=${userId}`);
+    if (!rawUserId) {
+      throw new Error("ログインユーザーIDが確認できません");
+    }
+
+    const userId = encodeURIComponent(rawUserId);
+
+    const response = await fetch(
+      `/api/battle/history?userId=${userId}`,
+      {
+        method: "GET",
+        cache: "no-store"
+      }
+    );
     const data = await response.json();
 
     if (!response.ok || !data.ok) {
@@ -1075,6 +1087,7 @@ function handleBattleFinished(data) {
   }
 
   battleHistoryLoaded = false;
+  battleHistoryItems = [];
 
   if (typeof refreshMyPageUserFromServer === "function") {
     refreshMyPageUserFromServer();
