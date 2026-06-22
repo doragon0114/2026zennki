@@ -518,12 +518,11 @@ async function finishRoom(room) {
   }
 
   clearQuestionTimer(room);
-
   room.finished = true;
 
   const [playerA, playerB] = room.players;
-  const scoreA = room.scores[playerA.id] || 0;
-  const scoreB = room.scores[playerB.id] || 0;
+  const scoreA = Number(room.scores[playerA.id] || 0);
+  const scoreB = Number(room.scores[playerB.id] || 0);
 
   let message = "引き分けです。";
 
@@ -531,6 +530,16 @@ async function finishRoom(room) {
     message = `${playerA.name}さんの勝利です。`;
   } else if (scoreB > scoreA) {
     message = `${playerB.name}さんの勝利です。`;
+  }
+
+  /*
+   * 必ず対戦終了通知より先に履歴を保存する。
+   * これがないと、履歴画面を開いても取得できない。
+   */
+  try {
+    await saveRoomHistory(room);
+  } catch (err) {
+    console.error("saveRoomHistory error:", err);
   }
 
   try {
