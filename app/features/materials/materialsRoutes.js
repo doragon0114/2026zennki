@@ -157,6 +157,69 @@ router.get("/:materialId", async (req, res) => {
 });
 
 // ==================================================
+// DELETE /api/materials/:materialId
+// 自分が所有する問題セットを、問題ごと削除する
+// ==================================================
+router.delete("/:materialId", async (req, res) => {
+  try {
+    const userId = requireUserId(req, res);
+
+    if (!userId) {
+      return;
+    }
+
+    const { materialId } = req.params;
+
+    // 本人が所有している問題セットか先に確認
+    const list = await db.findQuestionListByIdAndUserId(
+      materialId,
+      userId
+    );
+
+    if (!list) {
+      return res.status(404).json({
+        ok: false,
+        message:
+          "問題セットが見つからないか、削除する権限がありません"
+      });
+    }
+
+    const deleted = await db.deleteQuestionListByUserId(
+      materialId,
+      userId
+    );
+
+    if (!deleted) {
+      return res.status(404).json({
+        ok: false,
+        message:
+          "問題セットが見つからないか、すでに削除されています"
+      });
+    }
+
+    const payload = await buildPayload(userId);
+
+    res.json({
+      ok: true,
+      message: "問題セットを削除しました",
+      deleted,
+      ...payload
+    });
+  } catch (err) {
+    console.error(
+      "DELETE /api/materials/:materialId error:",
+      err
+    );
+
+    res.status(500).json({
+      ok: false,
+      message:
+        err.message || "問題セットの削除に失敗しました"
+    });
+  }
+});
+
+// ==================================================
 // PATCH /api/materials/:materialId/share
 // 自分の問題セットだけ公開・非公開切り替え
 // ==================================================

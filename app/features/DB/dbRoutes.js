@@ -714,6 +714,128 @@ async function deleteQuestion(questionId) {
   }
 }
 
+// ==================================================
+// 問題セット削除
+// materials を削除すると、外部キーのCASCADEにより
+// question / question_choices なども削除される
+// ==================================================
+async function deleteQuestionListByUserId(materialId, userId) {
+  const safeMaterialId = String(materialId || "").trim();
+  const safeUserId = String(userId || "").trim();
+
+  if (!safeMaterialId || !safeUserId) {
+    return null;
+  }
+
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    // 自分が所有している問題セットか確認して、削除中はロックする
+    const [materialRows] = await conn.query(
+      `
+      SELECT
+        material_id,
+        user_id,
+        material_name
+      FROM materials
+      WHERE
+        material_id = ?
+        AND user_id = ?
+      LIMIT 1
+      FOR UPDATE
+      `,
+      [
+        safeMaterialId,
+        safeUserId
+      ]
+    );
+
+    const material = materialRows[0];
+
+    if (!material) {
+      await conn.rollback();
+      return null;
+    }
+
+    const [countRows] = await conn.query(
+      `
+      SELECT
+        COUNT(*) AS question_count
+      FROM question
+      WHERE material_id = ?
+      `,
+      [safeMaterialId]
+    );
+
+    const deletedQuestionCount =
+      Number(countRows[0]?.question_count || 0);
+
+    /*
+     * materials を削除する。
+     *
+     * 現在の外部キー設定では、
+     * question は ON DELETE CASCADE なので自動削除される。
+     * question_choices も question 経由で自動削除される。
+     */
+    const [deleteResult] = await conn.query(
+      `
+      DELETE FROM materials
+      WHERE
+        material_id = ?
+        AND user_id = ?
+      `,
+      [
+        safeMaterialId,
+        safeUserId
+      ]
+    );
+
+    if (deleteResult.affectedRows !== 1) {
+      throw new Error("問題セットを削除できませんでした");
+    }
+
+    /*
+     * users.question_count をDBの実際の問題数に合わせる。
+     * 単純減算より、ずれが起きにくい。
+     */
+    await conn.query(
+      `
+      UPDATE users
+      SET
+        question_count = (
+          SELECT COUNT(*)
+          FROM question q
+          INNER JOIN materials m
+            ON q.material_id = m.material_id
+          WHERE m.user_id = ?
+        ),
+        updated_at = NOW()
+      WHERE user_id = ?
+      `,
+      [
+        safeUserId,
+        safeUserId
+      ]
+    );
+
+    await conn.commit();
+
+    return {
+      materialId: material.material_id,
+      userId: material.user_id,
+      materialName: material.material_name,
+      deletedQuestionCount
+    };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 module.exports = {
   pool,
 
@@ -740,6 +862,7 @@ module.exports = {
   createQuestion,
   updateQuestion,
   deleteQuestion,
+  deleteQuestionListByUserId,
 
   getQuestionListsByUserId,
   findQuestionListByIdAndUserId,

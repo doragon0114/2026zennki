@@ -132,7 +132,28 @@ function renderMaterials() {
               </div>
               <div class="mini-set-meta">${fmtDate(m.createdAt || new Date().toISOString())} ・ ${qc}問</div>
             </div>
-            <div style="color:var(--gray);font-size:18px">›</div>
+            <div
+              style="
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                justify-content:center;
+                gap:8px;
+              "
+            >
+              <div style="color:var(--gray);font-size:18px">›</div>
+
+              <button
+                type="button"
+                class="btn btn-danger btn-xs"
+                onclick="
+                  event.stopPropagation();
+                  deleteMaterialSet('${esc(m.id)}');
+                "
+              >
+                削除
+              </button>
+            </div>
           </div>`;
       }).join("");
 
@@ -222,24 +243,73 @@ function renderQuestionEdit(params = {}) {
     </div>
 
     <div class="screen-body">
-      ${mat && mat.shared
-        ? `
-          <div class="alert alert-success">✓ この問題セットは公開中です</div>
-          <div style="display:flex;gap:8px;margin-bottom:14px">
-            <button class="btn btn-outline-gray btn-sm" onclick="shareSet('${esc(materialId)}', false)">
-              非公開にする
-            </button>
-            <button class="btn btn-primary btn-sm" onclick="navigate('question-set')">▶ 学習する</button>
-          </div>
-        `
-        : `
-          <div style="display:flex;gap:8px;margin-bottom:14px">
-            <button class="btn btn-outline-gray btn-sm" onclick="shareSet('${esc(materialId)}', true)">
-              ${svg(IC.share,14)} 公開・共有
-            </button>
-            <button class="btn btn-primary btn-sm" onclick="navigate('question-set')">▶ 学習する</button>
-          </div>
-        `}
+        ${mat && mat.shared
+          ? `
+            <div class="alert alert-success">
+              ✓ この問題セットは公開中です
+            </div>
+
+            <div
+              style="
+                display:flex;
+                gap:8px;
+                margin-bottom:14px;
+                flex-wrap:wrap;
+              "
+            >
+              <button
+                class="btn btn-outline-gray btn-sm"
+                onclick="shareSet('${esc(materialId)}', false)"
+              >
+                非公開にする
+              </button>
+
+              <button
+                class="btn btn-primary btn-sm"
+                onclick="navigate('question-set')"
+              >
+                ▶ 学習する
+              </button>
+
+              <button
+                class="btn btn-danger btn-sm"
+                onclick="deleteMaterialSet('${esc(materialId)}')"
+              >
+                セットを削除
+              </button>
+            </div>
+          `
+          : `
+            <div
+              style="
+                display:flex;
+                gap:8px;
+                margin-bottom:14px;
+                flex-wrap:wrap;
+              "
+            >
+              <button
+                class="btn btn-outline-gray btn-sm"
+                onclick="shareSet('${esc(materialId)}', true)"
+              >
+                ${svg(IC.share,14)} 公開・共有
+              </button>
+
+              <button
+                class="btn btn-primary btn-sm"
+                onclick="navigate('question-set')"
+              >
+                ▶ 学習する
+              </button>
+
+              <button
+                class="btn btn-danger btn-sm"
+                onclick="deleteMaterialSet('${esc(materialId)}')"
+              >
+                セットを削除
+              </button>
+            </div>
+          `}
       ${items}
     </div>
 
@@ -278,6 +348,93 @@ async function deleteQuestion(qid) {
 
     navigate("question-edit", { materialId });
   } catch {
+    alert("通信エラーが発生しました");
+  }
+}
+
+// ==================================================
+// 問題セット全体を削除する
+// ==================================================
+async function deleteMaterialSet(materialId) {
+  const material = S.materials.find(item => {
+    return item.id === materialId;
+  });
+
+  if (!material) {
+    alert("削除する問題セットが見つかりません");
+    return;
+  }
+
+  const questionCount = S.questions.filter(question => {
+    return question.materialId === materialId;
+  }).length;
+
+  const confirmed = confirm(
+    `問題セット「${material.name}」を削除しますか？\n\n` +
+    `${questionCount}問の問題もすべて削除されます。\n` +
+    "この操作は取り消せません。"
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      withUserId(
+        `/api/materials/${encodeURIComponent(materialId)}`
+      ),
+      {
+        method: "DELETE"
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      alert(
+        data.message || "問題セットの削除に失敗しました"
+      );
+      return;
+    }
+
+    applyMaterialsPayload(data.payload || data);
+
+    materialsLoaded = true;
+
+    // 個人学習側に削除前データが残らないようにする
+    if (typeof studyLoaded !== "undefined") {
+      studyLoaded = false;
+    }
+
+    // 削除対象を演習中データが参照していた場合は破棄する
+    if (
+      S.studySession &&
+      Array.isArray(S.studySession.questions) &&
+      S.studySession.questions.some(question => {
+        return question.materialId === materialId;
+      })
+    ) {
+      S.studySession = null;
+    }
+
+    save();
+
+    // users.question_count の最新値を取得
+    if (
+      typeof refreshMyPageUserFromServer === "function"
+    ) {
+      await refreshMyPageUserFromServer();
+    }
+
+    alert(
+      `問題セット「${material.name}」を削除しました。\n` +
+      `${Number(data.deleted?.deletedQuestionCount || questionCount)}問を削除しました。`
+    );
+
+    navigate("materials");
+  } catch (err) {
+    console.error("deleteMaterialSet error:", err);
     alert("通信エラーが発生しました");
   }
 }
