@@ -6,6 +6,9 @@ const materialShareService =
 
 const router = express.Router();
 
+/**
+ * リクエストからログインユーザーIDを取得する。
+ */
 function getRequestUserId(req) {
   return (
     req.session?.userId ||
@@ -16,6 +19,9 @@ function getRequestUserId(req) {
   );
 }
 
+/**
+ * ログインユーザーIDを必須にする。
+ */
 function requireUserId(req, res) {
   const userId = getRequestUserId(req);
 
@@ -24,70 +30,183 @@ function requireUserId(req, res) {
       ok: false,
       message: "ログインユーザーが確認できません"
     });
+
     return null;
   }
 
   return userId;
 }
 
-function toFrontMaterial(list, questionCount = 0) {
+/**
+ * MySQLから取得した日付をISO形式へ変換する。
+ */
+function toIsoStringOrNull(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date =
+    value instanceof Date
+      ? value
+      : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString();
+}
+
+/**
+ * DBのmaterialsデータをフロント用へ変換する。
+ */
+function toFrontMaterial(
+  list,
+  questionCount = 0
+) {
   return {
     id: list.material_id,
     userId: list.user_id,
     name: list.material_name,
-    category: list.category_name || "未分類",
-    categoryId: list.category_id === null || list.category_id === undefined
-      ? null
-      : Number(list.category_id),
+
+    // 表示用のカテゴリ名
+    category:
+      list.category_name || "未分類",
+
+    // DB上のカテゴリID
+    categoryId:
+      list.category_id === null ||
+      list.category_id === undefined
+        ? null
+        : Number(list.category_id),
+
     questionCount,
-    shared: Number(list.is_shared) === 1,
+
+    shared:
+      Number(list.is_shared) === 1,
+
     type: "file",
-    createdAt: list.created_at,
-    updatedAt: list.updated_at
+
+    createdAt:
+      toIsoStringOrNull(
+        list.created_at
+      ),
+
+    updatedAt:
+      toIsoStringOrNull(
+        list.updated_at
+      )
   };
 }
 
-function toFrontQuestion(q, material) {
+/**
+ * DBのquestionデータをフロント用へ変換する。
+ */
+function toFrontQuestion(
+  question,
+  material
+) {
   return {
-    id: q.question_id,
-    materialId: q.material_id,
-    text: q.question_text,
-    choices: Array.isArray(q.choices) ? q.choices : [],
-    correct: Number.isInteger(q.correct) ? q.correct : 0,
-    explanation: q.explanation || "",
-    category: material?.category_name || "未分類",
-    categoryId: material?.category_id === null || material?.category_id === undefined
-      ? null
-      : Number(material.category_id),
-    tags: [],
-    createdAt: q.created_at,
-    updatedAt: q.updated_at
+    id: question.question_id,
+
+    materialId:
+      question.material_id,
+
+    text:
+      question.question_text,
+
+    choices:
+      Array.isArray(question.choices)
+        ? question.choices
+        : [],
+
+    correct:
+      Number.isInteger(question.correct)
+        ? question.correct
+        : Number(question.correct) || 0,
+
+    explanation:
+      question.explanation || "",
+
+    // 表示用カテゴリ名
+    category:
+      material?.category_name ||
+      "未分類",
+
+    // DB上のカテゴリID
+    categoryId:
+      material?.category_id === null ||
+      material?.category_id === undefined
+        ? null
+        : Number(
+            material.category_id
+          ),
+
+    tags:
+      Array.isArray(question.tags)
+        ? question.tags
+        : [],
+
+    createdAt:
+      toIsoStringOrNull(
+        question.created_at
+      ),
+
+    updatedAt:
+      toIsoStringOrNull(
+        question.updated_at
+      )
   };
 }
 
+/**
+ * 指定ユーザーが所有する問題セットと問題を
+ * フロント用データへ変換して返す。
+ */
 async function buildPayload(userId) {
-  const lists = await db.getQuestionListsByUserId(userId);
+  const lists =
+    await db.getQuestionListsByUserId(
+      userId
+    );
 
-  const materialPairs = await Promise.all(
-    lists.map(async (list) => {
-      const questions = await db.findQuestionsByListId(list.material_id);
+  const materialPairs =
+    await Promise.all(
+      lists.map(async list => {
+        const questions =
+          await db.findQuestionsByListId(
+            list.material_id
+          );
 
-      return {
-        list,
-        questions
-      };
-    })
-  );
+        return {
+          list,
+          questions
+        };
+      })
+    );
 
-  const materials = materialPairs.map(pair => {
-    return toFrontMaterial(pair.list, pair.questions.length);
-  });
+  const materials =
+    materialPairs.map(
+      ({ list, questions }) => {
+        return toFrontMaterial(
+          list,
+          questions.length
+        );
+      }
+    );
 
-  const questions = materialPairs.flatMap(pair => {
-    return pair.questions.map(q => {
-      return toFrontQuestion(q, pair.list);
-    });
-  });
+  const questions =
+    materialPairs.flatMap(
+      ({ list, questions }) => {
+        return questions.map(
+          question => {
+            return toFrontQuestion(
+              question,
+              list
+            );
+          }
+        );
+      }
+    );
 
   return {
     materials,
@@ -101,21 +220,31 @@ async function buildPayload(userId) {
 // ==================================================
 router.get("/", async (req, res) => {
   try {
-    const userId = requireUserId(req, res);
-    if (!userId) return;
+    const userId =
+      requireUserId(req, res);
 
-    const payload = await buildPayload(userId);
+    if (!userId) {
+      return;
+    }
+
+    const payload =
+      await buildPayload(userId);
 
     res.json({
       ok: true,
       ...payload
     });
   } catch (err) {
-    console.error("GET /api/materials error:", err);
+    console.error(
+      "GET /api/materials error:",
+      err
+    );
 
     res.status(500).json({
       ok: false,
-      message: err.message || "問題セットの取得に失敗しました"
+      message:
+        err.message ||
+        "問題セットの取得に失敗しました"
     });
   }
 });
@@ -171,102 +300,143 @@ router.post(
 // GET /api/materials/:materialId
 // 自分の問題セットだけ詳細取得
 // ==================================================
-router.get("/:materialId", async (req, res) => {
-  try {
-    const userId = requireUserId(req, res);
-    if (!userId) return;
+router.get(
+  "/:materialId",
+  async (req, res) => {
+    try {
+      const userId =
+        requireUserId(req, res);
 
-    const list = await db.findQuestionListByIdAndUserId(
-      req.params.materialId,
-      userId
-    );
+      if (!userId) {
+        return;
+      }
 
-    if (!list) {
-      return res.status(404).json({
+      const list =
+        await db.findQuestionListByIdAndUserId(
+          req.params.materialId,
+          userId
+        );
+
+      if (!list) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "問題セットが見つからないか、管理権限がありません"
+        });
+      }
+
+      const questions =
+        await db.findQuestionsByListId(
+          list.material_id
+        );
+
+      res.json({
+        ok: true,
+
+        material:
+          toFrontMaterial(
+            list,
+            questions.length
+          ),
+
+        questions:
+          questions.map(question => {
+            return toFrontQuestion(
+              question,
+              list
+            );
+          })
+      });
+    } catch (err) {
+      console.error(
+        "GET /api/materials/:materialId error:",
+        err
+      );
+
+      res.status(500).json({
         ok: false,
-        message: "問題セットが見つからないか、管理権限がありません"
+        message:
+          err.message ||
+          "問題セット詳細の取得に失敗しました"
       });
     }
-
-    const qs = await db.findQuestionsByListId(list.material_id);
-
-    res.json({
-      ok: true,
-      material: toFrontMaterial(list, qs.length),
-      questions: qs.map(q => toFrontQuestion(q, list))
-    });
-  } catch (err) {
-    console.error("GET /api/materials/:materialId error:", err);
-
-    res.status(500).json({
-      ok: false,
-      message: err.message || "問題セット詳細の取得に失敗しました"
-    });
   }
-});
+);
 
 // ==================================================
 // DELETE /api/materials/:materialId
-// 自分が所有する問題セットを、問題ごと削除する
+// 自分が所有する問題セットを問題ごと削除
 // ==================================================
-router.delete("/:materialId", async (req, res) => {
-  try {
-    const userId = requireUserId(req, res);
+router.delete(
+  "/:materialId",
+  async (req, res) => {
+    try {
+      const userId =
+        requireUserId(req, res);
 
-    if (!userId) {
-      return;
-    }
+      if (!userId) {
+        return;
+      }
 
-    const { materialId } = req.params;
+      const { materialId } =
+        req.params;
 
-    // 本人が所有している問題セットか先に確認
-    const list = await db.findQuestionListByIdAndUserId(
-      materialId,
-      userId
-    );
+      /*
+       * 所有者本人の問題セットか確認する。
+       */
+      const list =
+        await db.findQuestionListByIdAndUserId(
+          materialId,
+          userId
+        );
 
-    if (!list) {
-      return res.status(404).json({
+      if (!list) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "問題セットが見つからないか、削除する権限がありません"
+        });
+      }
+
+      const deleted =
+        await db.deleteQuestionListByUserId(
+          materialId,
+          userId
+        );
+
+      if (!deleted) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "問題セットが見つからないか、すでに削除されています"
+        });
+      }
+
+      const payload =
+        await buildPayload(userId);
+
+      res.json({
+        ok: true,
+        message:
+          "問題セットを削除しました",
+        deleted,
+        ...payload
+      });
+    } catch (err) {
+      console.error(
+        "DELETE /api/materials/:materialId error:",
+        err
+      );
+
+      res.status(500).json({
         ok: false,
         message:
-          "問題セットが見つからないか、削除する権限がありません"
+          err.message ||
+          "問題セットの削除に失敗しました"
       });
     }
-
-    const deleted = await db.deleteQuestionListByUserId(
-      materialId,
-      userId
-    );
-
-    if (!deleted) {
-      return res.status(404).json({
-        ok: false,
-        message:
-          "問題セットが見つからないか、すでに削除されています"
-      });
-    }
-
-    const payload = await buildPayload(userId);
-
-    res.json({
-      ok: true,
-      message: "問題セットを削除しました",
-      deleted,
-      ...payload
-    });
-  } catch (err) {
-    console.error(
-      "DELETE /api/materials/:materialId error:",
-      err
-    );
-
-    res.status(500).json({
-      ok: false,
-      message:
-        err.message || "問題セットの削除に失敗しました"
-    });
   }
-});
+);
 
 // ==================================================
 // PATCH /api/materials/:materialId/share
@@ -276,33 +446,79 @@ router.patch(
   "/:materialId/share",
   async (req, res) => {
     try {
-      const userId = requireUserId(req, res);
+      const userId =
+        requireUserId(req, res);
 
       if (!userId) {
         return;
       }
 
+      const { materialId } =
+        req.params;
+
+      /*
+       * develop側の処理を残す。
+       * 所有者本人だけが公開・非公開を変更できる。
+       */
+      const list =
+        await db.findQuestionListByIdAndUserId(
+          materialId,
+          userId
+        );
+
+      if (!list) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "問題セットが見つからないか、管理権限がありません"
+        });
+      }
+
       const shared =
         Boolean(req.body.shared);
 
+      /*
+       * 問題共有機能側の処理を残す。
+       *
+       * 公開時:
+       *   materials.is_shared = 1
+       *   共有コードを新規発行または既存コードを取得
+       *
+       * 非公開時:
+       *   materials.is_shared = 0
+       *   共有コードを削除
+       *
+       * updateQuestionListShare()はここでは呼ばない。
+       * setShareStatus()の中で公開状態も更新するため。
+       */
       const result =
         await materialShareService
           .setShareStatus({
-            materialId:
-              req.params.materialId,
+            materialId,
             userId,
             shared
           });
 
+      /*
+       * 更新後の問題セット一覧を取得する。
+       */
       const payload =
         await buildPayload(userId);
 
       res.json({
         ok: true,
+
         message: shared
           ? "問題セットを公開しました"
           : "問題セットを非公開にしました",
-        shareCode: result.shareCode,
+
+        /*
+         * 公開時は共有コードが入る。
+         * 非公開時はnull。
+         */
+        shareCode:
+          result?.shareCode || null,
+
         ...payload
       });
     } catch (err) {
@@ -311,6 +527,10 @@ router.patch(
         err
       );
 
+      /*
+       * Service側で404や400を設定している場合は
+       * そのステータスコードを利用する。
+       */
       res.status(
         err.statusCode || 500
       ).json({
@@ -323,138 +543,244 @@ router.patch(
   }
 );
 
+
 // ==================================================
 // POST /api/materials/:materialId/questions
 // 自分の問題セットだけ問題追加
 // ==================================================
-router.post("/:materialId/questions", async (req, res) => {
-  try {
-    const userId = requireUserId(req, res);
-    if (!userId) return;
+router.post(
+  "/:materialId/questions",
+  async (req, res) => {
+    try {
+      const userId =
+        requireUserId(req, res);
 
-    const { materialId } = req.params;
+      if (!userId) {
+        return;
+      }
 
-    const list = await db.findQuestionListByIdAndUserId(materialId, userId);
+      const { materialId } =
+        req.params;
 
-    if (!list) {
-      return res.status(404).json({
+      /*
+       * 所有者本人の問題セットか確認する。
+       */
+      const list =
+        await db.findQuestionListByIdAndUserId(
+          materialId,
+          userId
+        );
+
+      if (!list) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "問題セットが見つからないか、管理権限がありません"
+        });
+      }
+
+      /*
+       * UUIDを使いつつ既存形式のq_を付ける。
+       */
+      const questionId =
+        `q_${randomUUID()}`;
+
+      await db.createQuestion(
+        questionId,
+        materialId,
+        req.body
+      );
+
+      const payload =
+        await buildPayload(userId);
+
+      res.status(201).json({
+        ok: true,
+        ...payload
+      });
+    } catch (err) {
+      console.error(
+        "POST /api/materials/:materialId/questions error:",
+        err
+      );
+
+      res.status(500).json({
         ok: false,
-        message: "問題セットが見つからないか、管理権限がありません"
+        message:
+          err.message ||
+          "問題の追加に失敗しました"
       });
     }
-
-    const questionId = `q_${randomUUID()}`;
-
-    await db.createQuestion(questionId, materialId, req.body);
-
-    const payload = await buildPayload(userId);
-
-    res.json({
-      ok: true,
-      ...payload
-    });
-  } catch (err) {
-    console.error("POST /api/materials/:materialId/questions error:", err);
-
-    res.status(500).json({
-      ok: false,
-      message: err.message || "問題の追加に失敗しました"
-    });
   }
-});
+);
 
 // ==================================================
 // PUT /api/materials/:materialId/questions/:questionId
 // 自分の問題セットだけ問題更新
 // ==================================================
-router.put("/:materialId/questions/:questionId", async (req, res) => {
-  try {
-    const userId = requireUserId(req, res);
-    if (!userId) return;
+router.put(
+  "/:materialId/questions/:questionId",
+  async (req, res) => {
+    try {
+      const userId =
+        requireUserId(req, res);
 
-    const { materialId, questionId } = req.params;
+      if (!userId) {
+        return;
+      }
 
-    const list = await db.findQuestionListByIdAndUserId(materialId, userId);
+      const {
+        materialId,
+        questionId
+      } = req.params;
 
-    if (!list) {
-      return res.status(404).json({
+      /*
+       * 所有者本人の問題セットか確認する。
+       */
+      const list =
+        await db.findQuestionListByIdAndUserId(
+          materialId,
+          userId
+        );
+
+      if (!list) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "問題セットが見つからないか、管理権限がありません"
+        });
+      }
+
+      const question =
+        await db.findQuestionById(
+          questionId
+        );
+
+      /*
+       * 指定問題が対象の問題セットに属しているか確認する。
+       */
+      if (
+        !question ||
+        question.material_id !==
+          materialId
+      ) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "問題が見つかりません"
+        });
+      }
+
+      await db.updateQuestion(
+        questionId,
+        req.body
+      );
+
+      const payload =
+        await buildPayload(userId);
+
+      res.json({
+        ok: true,
+        ...payload
+      });
+    } catch (err) {
+      console.error(
+        "PUT /api/materials/:materialId/questions/:questionId error:",
+        err
+      );
+
+      res.status(500).json({
         ok: false,
-        message: "問題セットが見つからないか、管理権限がありません"
+        message:
+          err.message ||
+          "問題の更新に失敗しました"
       });
     }
-
-    const q = await db.findQuestionById(questionId);
-
-    if (!q || q.material_id !== materialId) {
-      return res.status(404).json({
-        ok: false,
-        message: "問題が見つかりません"
-      });
-    }
-
-    await db.updateQuestion(questionId, req.body);
-
-    const payload = await buildPayload(userId);
-
-    res.json({
-      ok: true,
-      ...payload
-    });
-  } catch (err) {
-    console.error("PUT /api/materials/:materialId/questions/:questionId error:", err);
-
-    res.status(500).json({
-      ok: false,
-      message: err.message || "問題の更新に失敗しました"
-    });
   }
-});
+);
 
 // ==================================================
 // DELETE /api/materials/:materialId/questions/:questionId
 // 自分の問題セットだけ問題削除
 // ==================================================
-router.delete("/:materialId/questions/:questionId", async (req, res) => {
-  try {
-    const userId = requireUserId(req, res);
-    if (!userId) return;
+router.delete(
+  "/:materialId/questions/:questionId",
+  async (req, res) => {
+    try {
+      const userId =
+        requireUserId(req, res);
 
-    const { materialId, questionId } = req.params;
+      if (!userId) {
+        return;
+      }
 
-    const list = await db.findQuestionListByIdAndUserId(materialId, userId);
+      const {
+        materialId,
+        questionId
+      } = req.params;
 
-    if (!list) {
-      return res.status(404).json({
+      /*
+       * 所有者本人の問題セットか確認する。
+       */
+      const list =
+        await db.findQuestionListByIdAndUserId(
+          materialId,
+          userId
+        );
+
+      if (!list) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "問題セットが見つからないか、管理権限がありません"
+        });
+      }
+
+      const question =
+        await db.findQuestionById(
+          questionId
+        );
+
+      /*
+       * 指定問題が対象の問題セットに属しているか確認する。
+       */
+      if (
+        !question ||
+        question.material_id !==
+          materialId
+      ) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "問題が見つかりません"
+        });
+      }
+
+      await db.deleteQuestion(
+        questionId
+      );
+
+      const payload =
+        await buildPayload(userId);
+
+      res.json({
+        ok: true,
+        ...payload
+      });
+    } catch (err) {
+      console.error(
+        "DELETE /api/materials/:materialId/questions/:questionId error:",
+        err
+      );
+
+      res.status(500).json({
         ok: false,
-        message: "問題セットが見つからないか、管理権限がありません"
+        message:
+          err.message ||
+          "問題の削除に失敗しました"
       });
     }
-
-    const q = await db.findQuestionById(questionId);
-
-    if (!q || q.material_id !== materialId) {
-      return res.status(404).json({
-        ok: false,
-        message: "問題が見つかりません"
-      });
-    }
-
-    await db.deleteQuestion(questionId);
-
-    const payload = await buildPayload(userId);
-
-    res.json({
-      ok: true,
-      ...payload
-    });
-  } catch (err) {
-    console.error("DELETE /api/materials/:materialId/questions/:questionId error:", err);
-
-    res.status(500).json({
-      ok: false,
-      message: err.message || "問題の削除に失敗しました"
-    });
   }
-});
+);
 
 module.exports = router;
