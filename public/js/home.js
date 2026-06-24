@@ -13,6 +13,19 @@
 let homeCalendarLoaded = false;
 let homeCalendarLoading = false;
 let homeCalendarSummary = null;
+let homeCorrectRates = {};      // ← 追加: { materialId -> pct }
+let homeCorrectRatesLoaded = false;
+
+async function loadCorrectRatesFromServer() {
+  try {
+    const res = await fetch("/api/study/correct-rates");
+    const data = await res.json();
+    if (data.ok) homeCorrectRates = data.rates || {};
+  } catch {
+    // 取得失敗は無視（表示なし扱い）
+  }
+  homeCorrectRatesLoaded = true;
+}
 
 let homeMaterialsRefreshing = false;
 
@@ -119,6 +132,9 @@ async function loadHomeCalendarFromServer(force = false) {
     };
 
     homeCalendarLoaded = true;
+
+    // 正答率も取得（並行）
+    await loadCorrectRatesFromServer();
 
     const calendarEl = document.getElementById("home-calendar-card");
 
@@ -250,17 +266,20 @@ function renderHome() {
 
   const decks = S.materials.slice(0, 4).map((m,i) => {
     const qc = S.questions.filter(q=>q.materialId===m.id).length;
-    const pct = Math.min(98, 35 + (i * 17) % 60);
-    const pctClass = pct>=70 ? '' : (pct>=55 ? 'warn' : 'danger');
+    const rawPct = homeCorrectRates[m.id];
+    const hasPct = rawPct !== undefined;
+    const pct = hasPct ? rawPct : null;
+    const pctClass = !hasPct ? '' : pct>=70 ? '' : (pct>=55 ? 'warn' : 'danger');
+    const pctLabel = hasPct ? `${pct}%` : `<span style="font-size:11px;color:var(--gray)">未挑戦</span>`;
     return `
       <div class="mini-set-card" onclick="navigate('question-edit',{materialId:'${m.id}'})">
         <div class="mini-set-icon color-${i%6}">${deckIcons[i%deckIcons.length]}</div>
         <div class="mini-set-info">
           <div class="mini-set-title">${esc(m.name)}</div>
           <div class="mini-set-meta">${qc}問</div>
-          <div class="mini-set-bar-bg"><div class="mini-set-bar-fill" style="width:${pct}%"></div></div>
+          <div class="mini-set-bar-bg"><div class="mini-set-bar-fill" style="width:${pct ?? 0}%"></div></div>
         </div>
-        <div class="mini-set-pct ${pctClass}">${pct}%</div>
+        <div class="mini-set-pct ${pctClass}">${pctLabel}</div>
         <div class="mini-set-arrow">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
         </div>
