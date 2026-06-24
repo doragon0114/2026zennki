@@ -1,6 +1,8 @@
 const express = require("express");
 const { randomUUID } = require("crypto");
 const db = require("../DB/dbRoutes");
+const materialShareService =
+  require("./materialShareService");
 
 const router = express.Router();
 
@@ -56,22 +58,69 @@ function toIsoStringOrNull(value) {
 }
 
 /**
+ * 指定ユーザーの問題セットごとの最新正答率を取得する。
+ */
+async function getCorrectRatesByUserId(userId) {
+  const id = String(userId || "").trim();
+
+  if (!id) {
+    return {};
+  }
+
+  const [rows] = await db.query(
+    `
+    SELECT
+      r.material_id,
+      r.correct_rate
+    FROM results r
+    INNER JOIN (
+      SELECT
+        material_id,
+        MAX(finished_at) AS latest_finished_at
+      FROM results
+      WHERE
+        user_id = ?
+        AND material_id IS NOT NULL
+      GROUP BY material_id
+    ) latest
+      ON latest.material_id = r.material_id
+      AND latest.latest_finished_at = r.finished_at
+    WHERE
+      r.user_id = ?
+      AND r.material_id IS NOT NULL
+    `,
+    [
+      id,
+      id
+    ]
+  );
+
+  const rates = {};
+
+  for (const row of rows) {
+    rates[row.material_id] =
+      Number(row.correct_rate || 0);
+  }
+
+  return rates;
+}
+
+/**
  * DBのmaterialsデータをフロント用へ変換する。
  */
 function toFrontMaterial(
   list,
-  questionCount = 0
+  questionCount = 0,
+  correctRate = null
 ) {
   return {
     id: list.material_id,
     userId: list.user_id,
     name: list.material_name,
 
-    // 表示用のカテゴリ名
     category:
       list.category_name || "未分類",
 
-    // DB上のカテゴリID
     categoryId:
       list.category_id === null ||
       list.category_id === undefined
@@ -79,6 +128,12 @@ function toFrontMaterial(
         : Number(list.category_id),
 
     questionCount,
+
+    correctRate:
+      correctRate === null ||
+      correctRate === undefined
+        ? null
+        : Number(correctRate),
 
     shared:
       Number(list.is_shared) === 1,
@@ -182,12 +237,21 @@ async function buildPayload(userId) {
       })
     );
 
+  const correctRates =
+    await getCorrectRatesByUserId(userId);
+
   const materials =
     materialPairs.map(
       ({ list, questions }) => {
         return toFrontMaterial(
           list,
-          questions.length
+          questions.length,
+          Object.prototype.hasOwnProperty.call(
+            correctRates,
+            list.material_id
+          )
+            ? correctRates[list.material_id]
+            : null
         );
       }
     );
@@ -246,6 +310,53 @@ router.get("/", async (req, res) => {
     });
   }
 });
+
+// ==================================================
+// POST /api/materials/share-codes/redeem
+// 公開中の問題セットを共有コードで受け取る
+// ==================================================
+router.post(
+  "/share-codes/redeem",
+  async (req, res) => {
+    try {
+      const userId = requireUserId(req, res);
+
+      if (!userId) {
+        return;
+      }
+
+      const copiedMaterial =
+        await materialShareService.receiveByCode({
+          code: req.body.code,
+          userId
+        });
+
+      const payload = await buildPayload(userId);
+
+      res.json({
+        ok: true,
+        message:
+          "問題セットを受け取りました",
+        copiedMaterial,
+        ...payload
+      });
+    } catch (err) {
+      console.error(
+        "POST /api/materials/share-codes/redeem error:",
+        err
+      );
+
+      res.status(
+        err.statusCode || 500
+      ).json({
+        ok: false,
+        message:
+          err.message ||
+          "問題セットの受け取りに失敗しました"
+      });
+    }
+  }
+);
 
 // ==================================================
 // GET /api/materials/:materialId
@@ -391,7 +502,7 @@ router.delete(
 
 // ==================================================
 // PATCH /api/materials/:materialId/share
-// 自分の問題セットだけ公開・非公開切り替え
+// 公開・非公開切り替えと共有コードの発行・削除
 // ==================================================
 router.patch(
   "/:materialId/share",
@@ -408,7 +519,8 @@ router.patch(
         req.params;
 
       /*
-       * 所有者本人だけ公開状態を変更できる。
+       * develop側の処理を残す。
+       * 所有者本人だけが公開・非公開を変更できる。
        */
       const list =
         await db.findQuestionListByIdAndUserId(
@@ -428,13 +540,30 @@ router.patch(
         Boolean(req.body.shared);
 
       /*
-       * 公開状態はmaterials.is_sharedを更新する。
+       * 問題共有機能側の処理を残す。
+       *
+       * 公開時:
+       *   materials.is_shared = 1
+       *   共有コードを新規発行または既存コードを取得
+       *
+       * 非公開時:
+       *   materials.is_shared = 0
+       *   共有コードを削除
+       *
+       * updateQuestionListShare()はここでは呼ばない。
+       * setShareStatus()の中で公開状態も更新するため。
        */
-      await db.updateQuestionListShare(
-        materialId,
-        shared
-      );
+      const result =
+        await materialShareService
+          .setShareStatus({
+            materialId,
+            userId,
+            shared
+          });
 
+      /*
+       * 更新後の問題セット一覧を取得する。
+       */
       const payload =
         await buildPayload(userId);
 
@@ -445,6 +574,13 @@ router.patch(
           ? "問題セットを公開しました"
           : "問題セットを非公開にしました",
 
+        /*
+         * 公開時は共有コードが入る。
+         * 非公開時はnull。
+         */
+        shareCode:
+          result?.shareCode || null,
+
         ...payload
       });
     } catch (err) {
@@ -453,7 +589,13 @@ router.patch(
         err
       );
 
-      res.status(500).json({
+      /*
+       * Service側で404や400を設定している場合は
+       * そのステータスコードを利用する。
+       */
+      res.status(
+        err.statusCode || 500
+      ).json({
         ok: false,
         message:
           err.message ||
@@ -462,6 +604,7 @@ router.patch(
     }
   }
 );
+
 
 // ==================================================
 // POST /api/materials/:materialId/questions

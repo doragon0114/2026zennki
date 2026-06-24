@@ -428,8 +428,16 @@ async function getStudyDataByUserId(
     );
   }
 
+  const correctRates =
+    await getCorrectRatesByUserId(id);
+
   const materials =
     materialRows.map(row => {
+      const hasCorrectRate =
+      Object.prototype.hasOwnProperty.call(
+        correctRates,
+        row.material_id
+      );
       return {
         id: row.material_id,
 
@@ -455,6 +463,13 @@ async function getStudyDataByUserId(
               row.material_id
             ) || 0
           ),
+
+        correctRate:
+          hasCorrectRate
+            ? Number(
+                correctRates[row.material_id]
+              )
+            : null,
 
         shared:
           Number(row.is_shared) === 1,
@@ -483,7 +498,8 @@ async function getStudyDataByUserId(
   return {
     materials,
     questions,
-    categories
+    categories,
+    correctRates
   };
 }
 

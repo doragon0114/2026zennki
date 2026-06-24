@@ -63,8 +63,44 @@ async function loadMaterialsFromServer(force = false) {
 }
 
 function applyMaterialsPayload(data) {
-  S.materials = Array.isArray(data.materials) ? data.materials : [];
-  S.questions = Array.isArray(data.questions) ? data.questions : [];
+  const previousRates = new Map(
+    Array.isArray(S.materials)
+      ? S.materials.map(material => {
+          return [
+            material.id,
+            material.correctRate
+          ];
+        })
+      : []
+  );
+
+  const nextMaterials =
+    Array.isArray(data.materials)
+      ? data.materials
+      : [];
+
+  S.materials =
+    nextMaterials.map(material => {
+      const responseHasRate =
+        material.correctRate !== null &&
+        material.correctRate !== undefined;
+
+      return {
+        ...material,
+
+        correctRate:
+          responseHasRate
+            ? Number(material.correctRate)
+            : previousRates.has(material.id)
+              ? previousRates.get(material.id)
+              : null
+      };
+    });
+
+  S.questions =
+    Array.isArray(data.questions)
+      ? data.questions
+      : [];
 }
 
 function renderMaterialsLoading(title = "セット一覧") {
@@ -116,7 +152,26 @@ function renderMaterials() {
           svg(IC.map,22)
         ];
         const icon = matIcons[idx % matIcons.length];
-        const pct = Math.min(95, 40 + idx * 15);
+        const hasCorrectRate =
+          m.correctRate !== null &&
+          m.correctRate !== undefined &&
+          Number.isFinite(Number(m.correctRate));
+
+        const correctRate =
+          hasCorrectRate
+            ? Math.max(
+                0,
+                Math.min(
+                  100,
+                  Number(m.correctRate)
+                )
+              )
+            : 0;
+
+        const correctRateLabel =
+          hasCorrectRate
+            ? `${correctRate}%`
+            : "未挑戦";
 
         return `
           <div class="mini-set-card" onclick="navigate('question-edit',{materialId:'${esc(m.id)}'})" style="padding:16px">
@@ -128,9 +183,16 @@ function renderMaterials() {
                 <span class="tag tag-sky">${esc(m.type === "camera" ? "カメラ" : "ファイル")}</span>
               </div>
               <div class="mini-set-bar-bg">
-                <div class="mini-set-bar-fill" style="width:${pct}%"></div>
+                <div
+                  class="mini-set-bar-fill"
+                  style="width:${correctRate}%"
+                ></div>
               </div>
-              <div class="mini-set-meta">${fmtDate(m.createdAt || new Date().toISOString())} ・ ${qc}問</div>
+              <div class="mini-set-meta">
+                ${fmtDate(m.createdAt || new Date().toISOString())}
+                ・ ${qc}問
+                ・ 正答率 ${correctRateLabel}
+              </div>
             </div>
             <div
               style="
@@ -159,11 +221,43 @@ function renderMaterials() {
 
   return `
     <div class="screen-header blue-bg">
-      <button class="back-btn" onclick="navigate('home')">←</button>
-      <div class="header-title">セット一覧</div>
-      <button class="header-action" onclick="navigate('upload')">＋追加</button>
+      <button
+        class="back-btn"
+        onclick="navigate('home')"
+      >
+        ←
+      </button>
+
+      <div class="header-title">
+        セット一覧
+      </div>
+
+      <button
+        class="header-action"
+        onclick="navigate('upload')"
+      >
+        ＋追加
+      </button>
     </div>
-    <div class="screen-body">${items}</div>`;
+
+    <div class="screen-body">
+      <button
+        class="btn btn-outline"
+        style="
+          width:100%;
+          margin-bottom:14px;
+        "
+        onclick="openReceiveMaterialShareCode()"
+      >
+        ${svg(IC.share,14)}
+        共有コードを入力
+      </button>
+
+      ${items}
+    </div>
+
+    <div id="material-share-modal-root"></div>
+  `;
 }
 
 
@@ -258,8 +352,26 @@ function renderQuestionEdit(params = {}) {
               "
             >
               <button
+                class="btn btn-outline btn-sm"
+                onclick="
+                  shareSet(
+                    '${esc(materialId)}',
+                    true
+                  )
+                "
+              >
+                ${svg(IC.share,14)}
+                共有コードを表示
+              </button>
+
+              <button
                 class="btn btn-outline-gray btn-sm"
-                onclick="shareSet('${esc(materialId)}', false)"
+                onclick="
+                  shareSet(
+                    '${esc(materialId)}',
+                    false
+                  )
+                "
               >
                 非公開にする
               </button>
@@ -273,7 +385,11 @@ function renderQuestionEdit(params = {}) {
 
               <button
                 class="btn btn-danger btn-sm"
-                onclick="deleteMaterialSet('${esc(materialId)}')"
+                onclick="
+                  deleteMaterialSet(
+                    '${esc(materialId)}'
+                  )
+                "
               >
                 セットを削除
               </button>
@@ -290,9 +406,15 @@ function renderQuestionEdit(params = {}) {
             >
               <button
                 class="btn btn-outline-gray btn-sm"
-                onclick="shareSet('${esc(materialId)}', true)"
+                onclick="
+                  shareSet(
+                    '${esc(materialId)}',
+                    true
+                  )
+                "
               >
-                ${svg(IC.share,14)} 公開・共有
+                ${svg(IC.share,14)}
+                公開・共有
               </button>
 
               <button
@@ -304,16 +426,22 @@ function renderQuestionEdit(params = {}) {
 
               <button
                 class="btn btn-danger btn-sm"
-                onclick="deleteMaterialSet('${esc(materialId)}')"
+                onclick="
+                  deleteMaterialSet(
+                    '${esc(materialId)}'
+                  )
+                "
               >
                 セットを削除
               </button>
             </div>
-          `}
+          `
+        }
       ${items}
     </div>
 
-    <div id="edit-modal-root"></div>`;
+    <div id="edit-modal-root"></div>
+    <div id="material-share-modal-root"></div>`;
 }
 
 /* 問題を削除する
@@ -439,37 +567,416 @@ async function deleteMaterialSet(materialId) {
   }
 }
 
-/* 問題セットを公開する
-   TODO(DB担当): サーバーへ公開フラグを送信する */
-async function shareSet(materialId, shared = true) {
+
+function getMaterialShareModalRoot() {
+  let root = document.getElementById(
+    "material-share-modal-root"
+  );
+
+  if (!root) {
+    root = document.createElement("div");
+    root.id =
+      "material-share-modal-root";
+
+    document.body.appendChild(root);
+  }
+
+  return root;
+}
+
+function closeMaterialShareModal() {
+  const root = document.getElementById(
+    "material-share-modal-root"
+  );
+
+  if (root) {
+    root.innerHTML = "";
+  }
+}
+
+function showGeneratedShareCode(code) {
+  if (!code) {
+    alert(
+      "共有コードを取得できませんでした"
+    );
+    return;
+  }
+
+  const root =
+    getMaterialShareModalRoot();
+
+  root.innerHTML = `
+    <div class="edit-modal-overlay">
+      <div class="edit-modal">
+        <button
+          class="edit-modal-close"
+          onclick="closeMaterialShareModal()"
+        >
+          ${svg(IC.x,18)}
+        </button>
+
+        <div class="edit-modal-title">
+          ${svg(IC.share,16)}
+          共有コード
+        </div>
+
+        <div
+          style="
+            font-size:13px;
+            color:var(--gray);
+            line-height:1.7;
+            margin-bottom:14px;
+          "
+        >
+          このコードを知っているユーザーは、
+          公開中の問題セットを受け取れます。
+        </div>
+
+        <input
+          id="material-share-code-output"
+          class="inline-input"
+          type="text"
+          readonly
+          value="${esc(code)}"
+          style="
+            text-align:center;
+            font-size:24px;
+            font-weight:900;
+            letter-spacing:4px;
+          "
+        >
+
+        <button
+          class="btn btn-primary"
+          style="
+            width:100%;
+            margin-top:10px;
+          "
+          onclick="copyMaterialShareCode()"
+        >
+          コードをコピー
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+async function copyMaterialShareCode() {
+  const input = document.getElementById(
+    "material-share-code-output"
+  );
+
+  const code = input?.value || "";
+
+  if (!code) {
+    return;
+  }
+
   try {
-    const response = await fetch(withUserId(`/api/materials/${encodeURIComponent(materialId)}/share`), {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        shared
-      })
-    });
+    await navigator.clipboard
+      .writeText(code);
+
+    alert("共有コードをコピーしました");
+  } catch {
+    input.focus();
+    input.select();
+
+    try {
+      document.execCommand("copy");
+
+      alert(
+        "共有コードをコピーしました"
+      );
+    } catch {
+      alert(
+        `共有コード：${code}`
+      );
+    }
+  }
+}
+
+function openReceiveMaterialShareCode() {
+  const root =
+    getMaterialShareModalRoot();
+
+  root.innerHTML = `
+    <div class="edit-modal-overlay">
+      <div class="edit-modal">
+        <button
+          class="edit-modal-close"
+          onclick="closeMaterialShareModal()"
+        >
+          ${svg(IC.x,18)}
+        </button>
+
+        <div class="edit-modal-title">
+          ${svg(IC.share,16)}
+          問題セットを受け取る
+        </div>
+
+        <div
+          style="
+            font-size:13px;
+            color:var(--gray);
+            margin-bottom:14px;
+            line-height:1.7;
+          "
+        >
+          公開中の問題セットの
+          共有コードを入力してください。
+        </div>
+
+        <input
+          id="material-share-code-input"
+          class="inline-input"
+          type="text"
+          maxlength="8"
+          placeholder="例：A7K9P2RX"
+          autocomplete="off"
+          style="
+            text-align:center;
+            font-size:22px;
+            font-weight:900;
+            letter-spacing:4px;
+            text-transform:uppercase;
+          "
+          oninput="
+            this.value = this.value
+              .toUpperCase()
+              .replace(/[^A-Z0-9]/g, '');
+          "
+          onkeydown="
+            if(event.key === 'Enter') {
+              event.preventDefault();
+              receiveMaterialShareCode();
+            }
+          "
+        >
+
+        <div
+          id="material-share-error"
+          class="alert alert-error"
+          style="
+            display:none;
+            margin-top:10px;
+          "
+        ></div>
+
+        <button
+          id="material-share-receive-button"
+          class="btn btn-primary"
+          style="
+            width:100%;
+            margin-top:10px;
+          "
+          onclick="receiveMaterialShareCode()"
+        >
+          問題セットを受け取る
+        </button>
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => {
+    document
+      .getElementById(
+        "material-share-code-input"
+      )
+      ?.focus();
+  }, 0);
+}
+
+async function receiveMaterialShareCode() {
+  const input = document.getElementById(
+    "material-share-code-input"
+  );
+
+  const button = document.getElementById(
+    "material-share-receive-button"
+  );
+
+  const errorElement =
+    document.getElementById(
+      "material-share-error"
+    );
+
+  const code = String(
+    input?.value || ""
+  )
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+
+  if (code.length !== 8) {
+    if (errorElement) {
+      errorElement.style.display = "block";
+      errorElement.textContent =
+        "共有コードは8文字で入力してください";
+    }
+
+    return;
+  }
+
+  if (errorElement) {
+    errorElement.style.display = "none";
+    errorElement.textContent = "";
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "受取中...";
+  }
+
+  try {
+    const response = await fetch(
+      withUserId(
+        "/api/materials/share-codes/redeem"
+      ),
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+        body: JSON.stringify({
+          code
+        })
+      }
+    );
 
     const data = await response.json();
 
     if (!response.ok || !data.ok) {
-      alert(data.message || "公開状態の更新に失敗しました");
+      if (errorElement) {
+        errorElement.style.display =
+          "block";
+
+        errorElement.textContent =
+          data.message ||
+          "問題セットを受け取れませんでした";
+      }
+
       return;
     }
 
-    applyMaterialsPayload(data.payload || data);
+    applyMaterialsPayload(data);
+    materialsLoaded = true;
+
+    if (
+      typeof studyLoaded !== "undefined"
+    ) {
+      studyLoaded = false;
+    }
+
     save();
 
-    alert(shared
-      ? "問題セットを公開しました！\n他のユーザーがこのセットを学習できるようになりました。"
-      : "問題セットを非公開にしました。"
+    if (
+      typeof refreshMyPageUserFromServer ===
+      "function"
+    ) {
+      await refreshMyPageUserFromServer();
+    }
+
+    closeMaterialShareModal();
+
+    alert(
+      "問題セットを受け取りました"
     );
 
-    navigate("question-edit", { materialId });
-  } catch {
+    navigate(
+      "question-edit",
+      {
+        materialId:
+          data.copiedMaterial.id
+      }
+    );
+  } catch (err) {
+    console.error(
+      "receiveMaterialShareCode error:",
+      err
+    );
+
+    if (errorElement) {
+      errorElement.style.display = "block";
+      errorElement.textContent =
+        "通信エラーが発生しました";
+    }
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent =
+        "問題セットを受け取る";
+    }
+  }
+}
+
+/* 問題セットを公開する */
+async function shareSet(
+  materialId,
+  shared = true
+) {
+  try {
+    const response = await fetch(
+      withUserId(
+        `/api/materials/${
+          encodeURIComponent(materialId)
+        }/share`
+      ),
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+        body: JSON.stringify({
+          shared
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      alert(
+        data.message ||
+        "公開状態の更新に失敗しました"
+      );
+      return;
+    }
+
+    applyMaterialsPayload(data);
+    save();
+
+    /*
+     * 先に画面を更新し、その後コード表示モーダルを開く。
+     */
+    navigate(
+      "question-edit",
+      {
+        materialId
+      }
+    );
+
+    if (shared) {
+      setTimeout(() => {
+        showGeneratedShareCode(
+          data.shareCode
+        );
+      }, 0);
+
+      return;
+    }
+
+    alert(
+      "問題セットを非公開にしました。\n" +
+      "以前の共有コードは使用できません。"
+    );
+  } catch (err) {
+    console.error(
+      "shareSet error:",
+      err
+    );
+
     alert("通信エラーが発生しました");
   }
 }

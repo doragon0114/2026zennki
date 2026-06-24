@@ -1,3 +1,5 @@
+drop database Revino;
+
 -- ==================================================
 -- データベース作成
 -- ==================================================
@@ -338,3 +340,26 @@ CREATE TABLE IF NOT EXISTS `calendar` (
   INDEX idx_calendar_activity_date (activity_date)
 );
 
+-- ============================================================
+-- 問題セット共有コード
+--
+-- 公開状態は materials.is_shared で判定する。
+-- このテーブルは問題セットと共有コードの対応だけを保存する。
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS material_share_codes (
+  material_id VARCHAR(80) NOT NULL,
+  share_code CHAR(8) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (material_id),
+  UNIQUE KEY uq_material_share_codes_code (share_code),
+
+  CONSTRAINT fk_material_share_codes_material
+    FOREIGN KEY (material_id)
+    REFERENCES materials(material_id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;

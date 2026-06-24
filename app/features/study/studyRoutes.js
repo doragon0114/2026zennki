@@ -114,15 +114,34 @@ router.get("/results/:resultId/wrong", async (req, res) => {
 });
 
 // GET /api/study/correct-rates  ← ホーム画面用
+// ログイン中ユーザーの問題セットごとの最新正答率を取得
 router.get("/correct-rates", async (req, res) => {
   try {
-    const userId = req.session?.userId;
-    if (!userId) return res.json({ ok: true, rates: {} });
-    const rates = await studyRepository.getCorrectRatesByUserId(userId);
-    res.json({ ok: true, rates });
+    const userId = requireUserId(req, res);
+
+    if (!userId) {
+      return;
+    }
+
+    const rates =
+      await studyRepository.getCorrectRatesByUserId(userId);
+
+    res.json({
+      ok: true,
+      rates
+    });
   } catch (err) {
-    console.error("correct-rates error:", err);
-    res.status(500).json({ ok: false, message: err.message });
+    console.error(
+      "GET /api/study/correct-rates error:",
+      err
+    );
+
+    res.status(500).json({
+      ok: false,
+      message:
+        err.message ||
+        "正答率の取得に失敗しました"
+    });
   }
 });
 
