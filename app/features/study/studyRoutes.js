@@ -1,5 +1,6 @@
 const express = require("express");
 const studyService = require("./studyService");
+const studyRepository = require("./studyRepository");
 
 const router = express.Router();
 
@@ -28,6 +29,19 @@ router.post("/results", async (req, res) => {
     res.json({ ok: true, result });
   } catch (err) {
     console.error("results error:", err);
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+// GET /api/study/correct-rates  ← ホーム画面用
+router.get("/correct-rates", async (req, res) => {
+  try {
+    const userId = req.session?.userId;
+    if (!userId) return res.json({ ok: true, rates: {} });
+    const rates = await studyRepository.getCorrectRatesByUserId(userId);
+    res.json({ ok: true, rates });
+  } catch (err) {
+    console.error("correct-rates error:", err);
     res.status(500).json({ ok: false, message: err.message });
   }
 });

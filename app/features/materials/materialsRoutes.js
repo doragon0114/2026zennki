@@ -1,5 +1,5 @@
 const express = require("express");
-const { randomUUID } = require("crypto");
+const crypto = require("crypto");
 const db = require("../DB/dbRoutes");
 
 const router = express.Router();
@@ -8,41 +8,37 @@ const router = express.Router();
 async function buildPayload() {
   const lists = await db.getAllQuestionLists();
 
-  const materials = await Promise.all(
-    lists.map(async (list) => {
-      const questions = await db.findQuestionsByListId(list.material_id);
-      return {
-        id:            list.material_id,
-        name:          list.material_name,
-        category:      list.category_id,
-        questionCount: questions.length,
-        shared:        list.is_shared === 1,
-        type:          "file",
-        createdAt:     list.created_at,
-      };
-    })
-  );
-
-  const questionArrays = await Promise.all(
+  const listData = await Promise.all(
     lists.map(async (list) => {
       const qs = await db.findQuestionsByListId(list.material_id);
-      return qs.map((q) => ({
-        id:          q.question_id,
-        materialId:  q.material_id,
-        text:        q.question_text,
-        choices:     q.choices,
-        correct:     q.correct,
-        explanation: q.explanation || "",
-        category:    list.category_id,
-        tags:        [],
-      }));
+      return { list, qs };
     })
   );
 
-  return {
-    materials,
-    questions: questionArrays.flat(),
-  };
+  const materials = listData.map(({ list, qs }) => ({
+    id: list.material_id,
+    name: list.material_name,
+    category: list.category_id,
+    questionCount: qs.length,
+    shared: list.is_shared === 1,
+    type: "file",
+    createdAt: list.created_at ? new Date(list.created_at).toISOString() : new Date().toISOString(),
+  }));
+
+  const questions = listData.flatMap(({ list, qs }) =>
+    qs.map((q) => ({
+      id: q.question_id,
+      materialId: q.material_id,
+      text: q.question_text,
+      choices: q.choices,
+      correct: q.correct,
+      explanation: q.explanation || "",
+      category: list.category_id,
+      tags: [],
+    }))
+  );
+
+  return { materials, questions };
 }
 
 // GET /api/materials
@@ -65,23 +61,23 @@ router.get("/:materialId", async (req, res) => {
 
     const qs = await db.findQuestionsByListId(list.material_id);
     const material = {
-      id:            list.material_id,
-      name:          list.material_name,
-      category:      list.category_id,
+      id: list.material_id,
+      name: list.material_name,
+      category: list.category_id,
       questionCount: qs.length,
-      shared:        list.is_shared === 1,
-      type:          "file",
-      createdAt:     list.created_at,
+      shared: list.is_shared === 1,
+      type: "file",
+      createdAt: list.created_at ? new Date(list.created_at).toISOString() : new Date().toISOString(),
     };
     const questions = qs.map((q) => ({
-      id:          q.question_id,
-      materialId:  q.material_id,
-      text:        q.question_text,
-      choices:     q.choices,
-      correct:     q.correct,
+      id: q.question_id,
+      materialId: q.material_id,
+      text: q.question_text,
+      choices: q.choices,
+      correct: q.correct,
       explanation: q.explanation || "",
-      category:    list.category_id,
-      tags:        [],
+      category: list.category_id,
+      tags: [],
     }));
 
     res.json({ ok: true, material, questions });
@@ -93,18 +89,15 @@ router.get("/:materialId", async (req, res) => {
 // PATCH /api/materials/:materialId/share
 router.patch("/:materialId/share", async (req, res) => {
   try {
-    const { materialId } = req.params;
-    const list = await db.findQuestionListById(materialId);
+    const list = await db.findQuestionListById(req.params.materialId);
     if (!list) {
       return res.status(404).json({ ok: false, message: "問題セットが見つかりません" });
     }
-
     const shared = req.body.shared ? 1 : 0;
     await db.pool.query(
       "UPDATE Questions SET is_shared = ? WHERE material_id = ?",
-      [shared, materialId]
+      [shared, req.params.materialId]
     );
-
     const payload = await buildPayload();
     res.json({ ok: true, ...payload });
   } catch (err) {
@@ -121,7 +114,7 @@ router.post("/:materialId/questions", async (req, res) => {
       return res.status(404).json({ ok: false, message: "問題セットが見つかりません" });
     }
 
-    const questionId = randomUUID();
+    const questionId = crypto.randomUUID();
     await db.createQuestion(questionId, materialId, req.body);
 
     const payload = await buildPayload();
