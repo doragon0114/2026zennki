@@ -3,6 +3,8 @@ version: '3.8'
 services:
   app:
     build: ./app
+    env_file:
+      - .env
     ports:
       - "3000:3000"
     volumes:
@@ -15,6 +17,7 @@ services:
       - DB_PASSWORD=${MYSQL_PASSWORD}
       - DB_NAME=${MYSQL_DATABASE}
       - OLLAMA_URL=http://ollama:11434
+      - GOOGLE_VISION_API_KEY=${GOOGLE_VISION_API_KEY}
     depends_on:
       mysql:
         condition: service_healthy

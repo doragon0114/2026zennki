@@ -1,9 +1,45 @@
 [
   {
-    "id": "cal_8747dd1ee5eb",
-    "userId": "user_17d6bada3e",
+    "id": "cal_7674aa69c476",
+    "userId": "user_f990d9b2bc",
     "type": "study",
-    "sourceId": "study",
+    "sourceId": "study_result_9912c8660d590a91",
+    "points": 10,
+    "dateKey": "2026-06-19",
+    "createdAt": "2026-06-19T04:58:00.858Z"
+  },
+  {
+    "id": "cal_39f2adff746b",
+    "userId": "user_f990d9b2bc",
+    "type": "study",
+    "sourceId": "study_result_405f9723b753b736",
+    "points": 30,
+    "dateKey": "2026-06-19",
+    "createdAt": "2026-06-19T04:59:06.186Z"
+  },
+  {
+    "id": "cal_0c55d0ddbe53",
+    "userId": "user_4e13aea275",
+    "type": "study",
+    "sourceId": "study_result_7b95db7c5373322c",
+    "points": 40,
+    "dateKey": "2026-06-19",
+    "createdAt": "2026-06-19T05:12:09.103Z"
+  },
+  {
+    "id": "cal_41f65114bb74",
+    "userId": "user_4e13aea275",
+    "type": "study",
+    "sourceId": "study_result_81c5fd17efe20f68",
+    "points": 30,
+    "dateKey": "2026-06-19",
+    "createdAt": "2026-06-19T05:28:50.795Z"
+  },
+  {
+    "id": "cal_4c61cb113d15",
+    "userId": "user_4e13aea275",
+    "type": "study",
+    "sourceId": "study_result_2676091ec57bd09a",
     "points": 20,
     "dateKey": "2026-06-01",
     "createdAt": "2026-06-01T05:20:41.301Z"
@@ -43,5 +79,16 @@
     "points": 20,
     "dateKey": "2026-06-24",
     "createdAt": "2026-06-24T01:27:13.253Z"
+    "dateKey": "2026-06-19",
+    "createdAt": "2026-06-19T05:29:08.145Z"
+  },
+  {
+    "id": "cal_85fe8b2b851a",
+    "userId": "user_4e13aea275",
+    "type": "study",
+    "sourceId": "study_result_722cb99272e10be4",
+    "points": 50,
+    "dateKey": "2026-06-19",
+    "createdAt": "2026-06-19T05:29:38.617Z"
   }
 ]

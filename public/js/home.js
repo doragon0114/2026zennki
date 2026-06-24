@@ -27,6 +27,83 @@ async function loadCorrectRatesFromServer() {
   homeCorrectRatesLoaded = true;
 }
 
+let homeMaterialsRefreshing = false;
+
+function isHomeScreenVisible() {
+  return Boolean(document.getElementById("home-root"));
+}
+
+function renderHomeDecksHTML() {
+  const deckIcons = [
+    svg(IC.leaf,20),
+    svg(IC.bookOpen,20),
+    svg(IC.flask,20),
+    svg(IC.globe,20),
+    svg(IC.pencil,20),
+    svg(IC.dna,20),
+  ];
+
+  const decks = S.materials.slice(0, 4).map((m, i) => {
+    const qc = S.questions.filter(q => q.materialId === m.id).length;
+    const pct = Math.min(98, 35 + (i * 17) % 60);
+    const pctClass = pct >= 70 ? "" : pct >= 55 ? "warn" : "danger";
+
+    return `
+      <div class="mini-set-card" onclick="navigate('question-edit',{materialId:'${esc(m.id)}'})">
+        <div class="mini-set-icon color-${i % 6}">${deckIcons[i % deckIcons.length]}</div>
+        <div class="mini-set-info">
+          <div class="mini-set-title">${esc(m.name)}</div>
+          <div class="mini-set-meta">${qc}問</div>
+          <div class="mini-set-bar-bg">
+            <div class="mini-set-bar-fill" style="width:${pct}%"></div>
+          </div>
+        </div>
+        <div class="mini-set-pct ${pctClass}">${pct}%</div>
+        <div class="mini-set-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 6 15 12 9 18"/>
+          </svg>
+        </div>
+      </div>`;
+  }).join("");
+
+  return decks || `
+    <div class="text-center text-gray" style="padding:24px 0">
+      セットがまだありません。「セット追加」から始めよう。
+    </div>
+  `;
+}
+
+async function refreshHomeMaterialsLater() {
+  if (homeMaterialsRefreshing) {
+    return;
+  }
+
+  if (typeof loadMaterialsFromServer !== "function") {
+    return;
+  }
+
+  homeMaterialsRefreshing = true;
+
+  setTimeout(async () => {
+    try {
+      await loadMaterialsFromServer(true);
+
+      if (!isHomeScreenVisible()) {
+        return;
+      }
+
+      const deckEl = document.getElementById("home-decks");
+
+      if (deckEl) {
+        deckEl.innerHTML = renderHomeDecksHTML();
+      }
+    } finally {
+      homeMaterialsRefreshing = false;
+    }
+  }, 0);
+}
+
 async function loadHomeCalendarFromServer(force = false) {
   if (homeCalendarLoading) {
     return;
@@ -60,8 +137,9 @@ async function loadHomeCalendarFromServer(force = false) {
     await loadCorrectRatesFromServer();
 
     const calendarEl = document.getElementById("home-calendar-card");
-    if (calendarEl) {
-      navigate("home");
+
+    if (calendarEl && isHomeScreenVisible()) {
+      calendarEl.outerHTML = renderHomeCalendar();
     }
   } catch {
     homeCalendarSummary = null;
@@ -72,6 +150,17 @@ async function loadHomeCalendarFromServer(force = false) {
 
 function markHomeCalendarDirty() {
   homeCalendarLoaded = false;
+  homeCalendarSummary = null;
+
+  if (isHomeScreenVisible()) {
+    refreshHomeCalendarLater(true);
+  }
+}
+
+function refreshHomeCalendarLater(force = false) {
+  setTimeout(() => {
+    loadHomeCalendarFromServer(force);
+  }, 0);
 }
 
 /* 学習カレンダーカードを生成する（今日を含む直近7日間を表示） */
@@ -163,9 +252,13 @@ function renderHomeCalendar() {
 
 /* ホーム画面本体 */
 function renderHome() {
-  const lv        = getLevel(S.user.points);
-  const xp        = getXP(S.user.points);
-  const firstName = (S.user.name || '').split(/\s|　/)[0];
+  refreshHomeMaterialsLater();
+  refreshHomeCalendarLater(true);
+
+  const point = Number(S.user.point ?? S.user.points ?? 0);
+  const lv = getLevel(point);
+  const xp = getXP(point);
+  const firstName = (S.user.name || "").split(/\s|　/)[0];
   const deckIcons = [
     svg(IC.leaf,20), svg(IC.bookOpen,20), svg(IC.flask,20),
     svg(IC.globe,20), svg(IC.pencil,20),  svg(IC.dna,20),
@@ -194,6 +287,7 @@ function renderHome() {
   }).join('');
 
   return `
+  <div id="home-root">
     <div class="home-top">
       <div class="home-top-bar">
         <button class="home-menu-btn" onclick="navigate('mypage')" aria-label="menu">
@@ -217,7 +311,9 @@ function renderHome() {
         <div class="section-title">セット一覧</div>
         <button class="section-link" onclick="navigate('materials')">すべて見る ›</button>
       </div>
-      ${decks || `<div class="text-center text-gray" style="padding:24px 0">セットがまだありません。「セット追加」から始めよう。</div>`}
+      <div id="home-decks">
+        ${renderHomeDecksHTML()}
+      </div>
       <div class="home-action-row">
         <button class="btn btn-outline action-add" onclick="navigate('upload')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -251,7 +347,8 @@ function renderHome() {
         </div>
       </div>
       <div style="height:24px"></div>
-    </div>`;
+    </div>
+  </div>`;
 }
 
 /* お知らせポップアップ（プロトタイプ用） */

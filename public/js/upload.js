@@ -56,8 +56,14 @@ function renderUpload() {
         <input class="form-input" id="material-name" type="text" placeholder="例：数学ノート 第3章">
       </div>
       <div class="form-group">
-        <label class="form-label">カテゴリ（任意）</label>
-        <input class="form-input" id="material-cat" type="text" placeholder="例：数学、英語、歴史">
+        <label class="form-label">カテゴリ</label>
+        <select class="form-input" id="material-cat">
+          <option value="国語">国語</option>
+          <option value="数学">数学</option>
+          <option value="英語">英語</option>
+          <option value="理科">理科</option>
+          <option value="社会">社会</option>
+        </select>
       </div>
       <button class="btn btn-primary" onclick="startUpload()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -87,7 +93,7 @@ function triggerFileSelect() { document.getElementById('file-input').click(); }
 
 async function startUpload() {
   const name = document.getElementById('material-name').value.trim() || '無題の資料';
-  const cat  = document.getElementById('material-cat').value.trim() || '一般';
+  const cat  = document.getElementById('material-cat').value;
 
   let base64Image = null;
   if (selectedFile) {
@@ -175,8 +181,9 @@ async function runAIAnalysis(params) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: extractedText,
-        userId: S.user?.userId || "guest",
+        userId: S.user?.userId || S.user?.id,
         materialName: params.name || "生成された問題セット",
+        categoryName: params.category || "一般"
       })
     });
 

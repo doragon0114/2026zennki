@@ -1,10 +1,14 @@
 const WebSocket = require("ws");
 const crypto = require("crypto");
+const db = require("../DB/dbRoutes");
+const calendarService = require("../calendar/calendarService");
 const battleHistoryRepository = require("./battleHistoryRepository");
 
 const {
+  BATTLE_QUESTION_COUNT,
   getSubjectLabel,
-  buildBattleQuestions,
+  canUserBattleSubject,
+  buildBattleQuestionsForPlayers,
   toPublicQuestion
 } = require("./battleQuestionRepository");
 
@@ -12,12 +16,16 @@ const waitingPlayers = new Map();
 const playerRooms = new Map();
 const activeRooms = new Map();
 
+const BATTLE_POINT_WIN = 30;
+const BATTLE_POINT_DRAW = 10;
+const BATTLE_TIME_LIMIT = 15;
+
 function createId(prefix) {
   return `${prefix}_${crypto.randomBytes(5).toString("hex")}`;
 }
 
 function send(ws, type, payload = {}) {
-  if (ws.readyState !== WebSocket.OPEN) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
     return;
   }
 
@@ -50,20 +58,23 @@ function initBattleWebSocket(server) {
       name: "ゲスト",
       age: 15,
       subject: "math",
-      avatar: "🐧"
+      avatar: "🐧",
+      userId: null
     };
 
     send(ws, "connected", {
       playerId: player.id
     });
 
-    ws.on("message", raw => {
+    ws.on("message", async raw => {
       try {
         const data = JSON.parse(raw.toString());
-        handleMessage(player, data);
-      } catch {
+        await handleMessage(player, data);
+      } catch (err) {
+        console.error("battle websocket message error:", err);
+
         send(ws, "error", {
-          message: "通信データの形式が正しくありません"
+          message: err.message || "通信データの処理に失敗しました"
         });
       }
     });
@@ -76,10 +87,10 @@ function initBattleWebSocket(server) {
   console.log("Battle WebSocket is ready: /ws/battle");
 }
 
-function handleMessage(player, data) {
+async function handleMessage(player, data) {
   switch (data.type) {
     case "join":
-      handleJoin(player, data);
+      await handleJoin(player, data);
       break;
 
     case "submitAnswer":
@@ -102,16 +113,44 @@ function handleMessage(player, data) {
   }
 }
 
-function handleJoin(player, data) {
+async function handleJoin(player, data) {
   player.name = String(data.name || "ゲスト").trim().slice(0, 20);
   player.age = Number(data.age || 15);
   player.subject = data.subject || "math";
   player.avatar = data.avatar || "🐧";
-  player.userId = data.userId || player.id;
+  player.userId = String(data.userId || "").trim();
+
+  if (!player.userId) {
+    send(player.ws, "error", {
+      message: "ログインユーザーが確認できないため、対戦できません。"
+    });
+    return;
+  }
 
   if (!Number.isInteger(player.age) || player.age < 1 || player.age > 120) {
     send(player.ws, "error", {
       message: "年齢が正しくありません"
+    });
+    return;
+  }
+
+  const subjectLabel = getSubjectLabel(player.subject);
+
+  if (!subjectLabel) {
+    send(player.ws, "error", {
+      message: "教科が正しくありません。"
+    });
+    return;
+  }
+
+  const ownCheck = await canUserBattleSubject({
+    subject: player.subject,
+    userId: player.userId
+  });
+
+  if (!ownCheck.ok) {
+    send(player.ws, "error", {
+      message: `${subjectLabel}の問題をまだ持っていないため、対戦できません。資料アップロードから${subjectLabel}の問題を作成してください。`
     });
     return;
   }
@@ -124,33 +163,55 @@ function handleJoin(player, data) {
     name: player.name,
     age: player.age,
     subject: player.subject,
-    subjectLabel: getSubjectLabel(player.subject)
+    subjectLabel,
+    ownQuestionCount: ownCheck.count
   });
 
   if (waiting && waiting.ws.readyState === WebSocket.OPEN && waiting.id !== player.id) {
     waitingPlayers.delete(key);
-    createRoom(waiting, player);
+    await createRoom(waiting, player);
     return;
   }
 
   waitingPlayers.set(key, player);
 
   send(player.ws, "waiting", {
-    message: `${getSubjectLabel(player.subject)} / ${player.age}歳で相手を探しています。`
+    message: `${subjectLabel} / ${player.age}歳で相手を探しています。`
   });
 }
 
-function createRoom(playerA, playerB) {
+async function createRoom(playerA, playerB) {
   const roomId = createId("room");
-  const questions = buildBattleQuestions(playerA.subject);
 
-  if (questions.length < 5) {
+  const result = await buildBattleQuestionsForPlayers({
+    subject: playerA.subject,
+    playerAUserId: playerA.userId,
+    playerBUserId: playerB.userId
+  });
+
+  if (!result.ok) {
     send(playerA.ws, "error", {
-      message: "この教科の問題が不足しています"
+      message: result.message || `${getSubjectLabel(playerA.subject)}の対戦用問題が不足しています。`
     });
+
     send(playerB.ws, "error", {
-      message: "この教科の問題が不足しています"
+      message: result.message || `${getSubjectLabel(playerA.subject)}の対戦用問題が不足しています。`
     });
+
+    return;
+  }
+
+  const questions = result.questions;
+
+  if (questions.length < BATTLE_QUESTION_COUNT) {
+    send(playerA.ws, "error", {
+      message: `${getSubjectLabel(playerA.subject)}の対戦用問題が5問未満のため、対戦できません。`
+    });
+
+    send(playerB.ws, "error", {
+      message: `${getSubjectLabel(playerA.subject)}の対戦用問題が5問未満のため、対戦できません。`
+    });
+
     return;
   }
 
@@ -215,12 +276,12 @@ function nextQuestion(room) {
     total: room.questions.length,
     question: toPublicQuestion(question),
     scores: room.scores,
-    timeLimit: 15
+    timeLimit: BATTLE_TIME_LIMIT
   });
 
   room.timer = setTimeout(() => {
     closeQuestion(room, "時間切れです。");
-  }, 15000);
+  }, BATTLE_TIME_LIMIT * 1000);
 }
 
 function handleSubmitAnswer(player, data) {
@@ -245,7 +306,8 @@ function handleSubmitAnswer(player, data) {
 
   room.answers[player.id] = {
     chosen,
-    correct
+    correct,
+    questionId: question.id
   };
 
   if (correct) {
@@ -276,7 +338,8 @@ function closeQuestion(room, message) {
     if (!room.answers[player.id]) {
       room.answers[player.id] = {
         chosen: -1,
-        correct: false
+        correct: false,
+        questionId: question.id
       };
     }
   });
@@ -319,9 +382,6 @@ function handleReadyNext(player) {
   }
 }
 
-const BATTLE_POINT_WIN = 30;
-const BATTLE_POINT_DRAW = 10;
-
 function formatHistoryDate(date = new Date()) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -361,7 +421,7 @@ function buildHistoryRecord({ room, player, opponent, myScore, oppScore }) {
   };
 }
 
-function saveRoomHistory(room) {
+async function saveRoomHistory(room) {
   const [playerA, playerB] = room.players;
 
   const scoreA = room.scores[playerA.id] || 0;
@@ -384,21 +444,85 @@ function saveRoomHistory(room) {
     })
   ];
 
-  battleHistoryRepository.saveBattleHistory(records);
+  await battleHistoryRepository.saveBattleHistory(records);
 }
 
-function finishRoom(room) {
+async function applyWinnerStats(room) {
+  const [playerA, playerB] = room.players;
+
+  const scoreA = room.scores[playerA.id] || 0;
+  const scoreB = room.scores[playerB.id] || 0;
+
+  if (scoreA === scoreB) {
+    return null;
+  }
+
+  const winner = scoreA > scoreB ? playerA : playerB;
+
+  if (!winner.userId) {
+    return null;
+  }
+
+  return await db.addUserBattleWinStats(
+    winner.userId,
+    BATTLE_POINT_WIN
+  );
+}
+
+async function recordBattleCalendarActivity(room) {
+  if (!room || !Array.isArray(room.players)) {
+    return;
+  }
+
+  const [playerA, playerB] = room.players;
+
+  if (!playerA || !playerB) {
+    return;
+  }
+
+  const scoreA = room.scores[playerA.id] || 0;
+  const scoreB = room.scores[playerB.id] || 0;
+
+  let winnerUserId = null;
+
+  if (scoreA > scoreB) {
+    winnerUserId = playerA.userId;
+  } else if (scoreB > scoreA) {
+    winnerUserId = playerB.userId;
+  }
+
+  await Promise.all(
+    room.players.map(player => {
+      if (!player.userId) {
+        return Promise.resolve(null);
+      }
+
+      const points =
+        winnerUserId && String(player.userId) === String(winnerUserId)
+          ? BATTLE_POINT_WIN
+          : 0;
+
+      return calendarService.recordActivity({
+        userId: player.userId,
+        type: "battle",
+        sourceId: room.id,
+        points
+      });
+    })
+  );
+}
+
+async function finishRoom(room) {
   if (!room || room.finished) {
     return;
   }
 
   clearQuestionTimer(room);
-
   room.finished = true;
 
   const [playerA, playerB] = room.players;
-  const scoreA = room.scores[playerA.id] || 0;
-  const scoreB = room.scores[playerB.id] || 0;
+  const scoreA = Number(room.scores[playerA.id] || 0);
+  const scoreB = Number(room.scores[playerB.id] || 0);
 
   let message = "引き分けです。";
 
@@ -408,7 +532,27 @@ function finishRoom(room) {
     message = `${playerB.name}さんの勝利です。`;
   }
 
-  saveRoomHistory(room);
+  /*
+   * 必ず対戦終了通知より先に履歴を保存する。
+   * これがないと、履歴画面を開いても取得できない。
+   */
+  try {
+    await saveRoomHistory(room);
+  } catch (err) {
+    console.error("saveRoomHistory error:", err);
+  }
+
+  try {
+    await applyWinnerStats(room);
+  } catch (err) {
+    console.error("applyWinnerStats error:", err);
+  }
+
+  try {
+    await recordBattleCalendarActivity(room);
+  } catch (err) {
+    console.error("recordBattleCalendarActivity error:", err);
+  }
 
   broadcast(room, "finished", {
     message,
