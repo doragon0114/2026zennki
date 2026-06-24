@@ -63,8 +63,44 @@ async function loadMaterialsFromServer(force = false) {
 }
 
 function applyMaterialsPayload(data) {
-  S.materials = Array.isArray(data.materials) ? data.materials : [];
-  S.questions = Array.isArray(data.questions) ? data.questions : [];
+  const previousRates = new Map(
+    Array.isArray(S.materials)
+      ? S.materials.map(material => {
+          return [
+            material.id,
+            material.correctRate
+          ];
+        })
+      : []
+  );
+
+  const nextMaterials =
+    Array.isArray(data.materials)
+      ? data.materials
+      : [];
+
+  S.materials =
+    nextMaterials.map(material => {
+      const responseHasRate =
+        material.correctRate !== null &&
+        material.correctRate !== undefined;
+
+      return {
+        ...material,
+
+        correctRate:
+          responseHasRate
+            ? Number(material.correctRate)
+            : previousRates.has(material.id)
+              ? previousRates.get(material.id)
+              : null
+      };
+    });
+
+  S.questions =
+    Array.isArray(data.questions)
+      ? data.questions
+      : [];
 }
 
 function renderMaterialsLoading(title = "セット一覧") {
@@ -116,7 +152,26 @@ function renderMaterials() {
           svg(IC.map,22)
         ];
         const icon = matIcons[idx % matIcons.length];
-        const pct = Math.min(95, 40 + idx * 15);
+        const hasCorrectRate =
+          m.correctRate !== null &&
+          m.correctRate !== undefined &&
+          Number.isFinite(Number(m.correctRate));
+
+        const correctRate =
+          hasCorrectRate
+            ? Math.max(
+                0,
+                Math.min(
+                  100,
+                  Number(m.correctRate)
+                )
+              )
+            : 0;
+
+        const correctRateLabel =
+          hasCorrectRate
+            ? `${correctRate}%`
+            : "未挑戦";
 
         return `
           <div class="mini-set-card" onclick="navigate('question-edit',{materialId:'${esc(m.id)}'})" style="padding:16px">
@@ -128,9 +183,16 @@ function renderMaterials() {
                 <span class="tag tag-sky">${esc(m.type === "camera" ? "カメラ" : "ファイル")}</span>
               </div>
               <div class="mini-set-bar-bg">
-                <div class="mini-set-bar-fill" style="width:${pct}%"></div>
+                <div
+                  class="mini-set-bar-fill"
+                  style="width:${correctRate}%"
+                ></div>
               </div>
-              <div class="mini-set-meta">${fmtDate(m.createdAt || new Date().toISOString())} ・ ${qc}問</div>
+              <div class="mini-set-meta">
+                ${fmtDate(m.createdAt || new Date().toISOString())}
+                ・ ${qc}問
+                ・ 正答率 ${correctRateLabel}
+              </div>
             </div>
             <div
               style="

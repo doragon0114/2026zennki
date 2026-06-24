@@ -18,13 +18,71 @@ let homeCorrectRatesLoaded = false;
 
 async function loadCorrectRatesFromServer() {
   try {
-    const res = await fetch("/api/study/correct-rates");
+    const userId = encodeURIComponent(
+      S.user?.userId ||
+      S.user?.id ||
+      ""
+    );
+
+    const res = await fetch(
+      `/api/study/correct-rates?userId=${userId}`
+    );
+
     const data = await res.json();
-    if (data.ok) homeCorrectRates = data.rates || {};
-  } catch {
-    // 取得失敗は無視（表示なし扱い）
+
+    if (!res.ok || !data.ok) {
+      throw new Error(
+        data.message ||
+        "正答率の取得に失敗しました"
+      );
+    }
+
+    homeCorrectRates =
+      data.rates || {};
+
+    /*
+     * 他画面でも使えるようにS.materialsへ反映する。
+     */
+    if (Array.isArray(S.materials)) {
+      S.materials = S.materials.map(material => {
+        const hasRate =
+          Object.prototype.hasOwnProperty.call(
+            homeCorrectRates,
+            material.id
+          );
+
+        return {
+          ...material,
+          correctRate:
+            hasRate
+              ? Number(
+                  homeCorrectRates[material.id]
+                )
+              : null
+        };
+      });
+
+      save();
+    }
+
+    const deckEl =
+      document.getElementById("home-decks");
+
+    if (
+      deckEl &&
+      isHomeScreenVisible()
+    ) {
+      deckEl.innerHTML =
+        renderHomeDecksHTML();
+    }
+  } catch (err) {
+    console.error(
+      "loadCorrectRatesFromServer error:",
+      err
+    );
+  } finally {
+    homeCorrectRatesLoaded = true;
   }
-  homeCorrectRatesLoaded = true;
 }
 
 let homeMaterialsRefreshing = false;
@@ -40,35 +98,111 @@ function renderHomeDecksHTML() {
     svg(IC.flask,20),
     svg(IC.globe,20),
     svg(IC.pencil,20),
-    svg(IC.dna,20),
+    svg(IC.dna,20)
   ];
 
-  const decks = S.materials.slice(0, 4).map((m, i) => {
-    const qc = S.questions.filter(q => q.materialId === m.id).length;
-    const pct = Math.min(98, 35 + (i * 17) % 60);
-    const pctClass = pct >= 70 ? "" : pct >= 55 ? "warn" : "danger";
+  const decks = S.materials.slice(0, 4)
+    .map((material, index) => {
+      const questionCount =
+        S.questions.filter(question => {
+          return question.materialId === material.id;
+        }).length;
 
-    return `
-      <div class="mini-set-card" onclick="navigate('question-edit',{materialId:'${esc(m.id)}'})">
-        <div class="mini-set-icon color-${i % 6}">${deckIcons[i % deckIcons.length]}</div>
-        <div class="mini-set-info">
-          <div class="mini-set-title">${esc(m.name)}</div>
-          <div class="mini-set-meta">${qc}問</div>
-          <div class="mini-set-bar-bg">
-            <div class="mini-set-bar-fill" style="width:${pct}%"></div>
+      const mapHasRate =
+        Object.prototype.hasOwnProperty.call(
+          homeCorrectRates,
+          material.id
+        );
+
+      const rawRate =
+        material.correctRate !== null &&
+        material.correctRate !== undefined
+          ? material.correctRate
+          : mapHasRate
+            ? homeCorrectRates[material.id]
+            : null;
+
+      const hasRate =
+        rawRate !== null &&
+        rawRate !== undefined &&
+        Number.isFinite(Number(rawRate));
+
+      const correctRate =
+        hasRate
+          ? Math.max(
+              0,
+              Math.min(
+                100,
+                Number(rawRate)
+              )
+            )
+          : 0;
+
+      const rateClass =
+        !hasRate
+          ? ""
+          : correctRate >= 70
+            ? ""
+            : correctRate >= 55
+              ? "warn"
+              : "danger";
+
+      const rateLabel =
+        hasRate
+          ? `${correctRate}%`
+          : `<span style="font-size:11px;color:var(--gray)">未挑戦</span>`;
+
+      return `
+        <div
+          class="mini-set-card"
+          onclick="navigate('question-edit',{materialId:'${esc(material.id)}'})"
+        >
+          <div class="mini-set-icon color-${index % 6}">
+            ${deckIcons[index % deckIcons.length]}
+          </div>
+
+          <div class="mini-set-info">
+            <div class="mini-set-title">
+              ${esc(material.name)}
+            </div>
+
+            <div class="mini-set-meta">
+              ${questionCount}問
+            </div>
+
+            <div class="mini-set-bar-bg">
+              <div
+                class="mini-set-bar-fill"
+                style="width:${correctRate}%"
+              ></div>
+            </div>
+          </div>
+
+          <div class="mini-set-pct ${rateClass}">
+            ${rateLabel}
+          </div>
+
+          <div class="mini-set-arrow">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="9 6 15 12 9 18"/>
+            </svg>
           </div>
         </div>
-        <div class="mini-set-pct ${pctClass}">${pct}%</div>
-        <div class="mini-set-arrow">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 6 15 12 9 18"/>
-          </svg>
-        </div>
-      </div>`;
-  }).join("");
+      `;
+    })
+    .join("");
 
   return decks || `
-    <div class="text-center text-gray" style="padding:24px 0">
+    <div
+      class="text-center text-gray"
+      style="padding:24px 0"
+    >
       セットがまだありません。「セット追加」から始めよう。
     </div>
   `;
@@ -255,36 +389,14 @@ function renderHome() {
   refreshHomeMaterialsLater();
   refreshHomeCalendarLater(true);
 
+  setTimeout(() => {
+    loadCorrectRatesFromServer();
+  }, 0);
+
   const point = Number(S.user.point ?? S.user.points ?? 0);
   const lv = getLevel(point);
   const xp = getXP(point);
   const firstName = (S.user.name || "").split(/\s|　/)[0];
-  const deckIcons = [
-    svg(IC.leaf,20), svg(IC.bookOpen,20), svg(IC.flask,20),
-    svg(IC.globe,20), svg(IC.pencil,20),  svg(IC.dna,20),
-  ];
-
-  const decks = S.materials.slice(0, 4).map((m,i) => {
-    const qc = S.questions.filter(q=>q.materialId===m.id).length;
-    const rawPct = homeCorrectRates[m.id];
-    const hasPct = rawPct !== undefined;
-    const pct = hasPct ? rawPct : null;
-    const pctClass = !hasPct ? '' : pct>=70 ? '' : (pct>=55 ? 'warn' : 'danger');
-    const pctLabel = hasPct ? `${pct}%` : `<span style="font-size:11px;color:var(--gray)">未挑戦</span>`;
-    return `
-      <div class="mini-set-card" onclick="navigate('question-edit',{materialId:'${m.id}'})">
-        <div class="mini-set-icon color-${i%6}">${deckIcons[i%deckIcons.length]}</div>
-        <div class="mini-set-info">
-          <div class="mini-set-title">${esc(m.name)}</div>
-          <div class="mini-set-meta">${qc}問</div>
-          <div class="mini-set-bar-bg"><div class="mini-set-bar-fill" style="width:${pct ?? 0}%"></div></div>
-        </div>
-        <div class="mini-set-pct ${pctClass}">${pctLabel}</div>
-        <div class="mini-set-arrow">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-        </div>
-      </div>`;
-  }).join('');
 
   return `
   <div id="home-root">

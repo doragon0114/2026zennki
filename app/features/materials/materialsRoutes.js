@@ -58,22 +58,69 @@ function toIsoStringOrNull(value) {
 }
 
 /**
+ * 指定ユーザーの問題セットごとの最新正答率を取得する。
+ */
+async function getCorrectRatesByUserId(userId) {
+  const id = String(userId || "").trim();
+
+  if (!id) {
+    return {};
+  }
+
+  const [rows] = await db.query(
+    `
+    SELECT
+      r.material_id,
+      r.correct_rate
+    FROM results r
+    INNER JOIN (
+      SELECT
+        material_id,
+        MAX(finished_at) AS latest_finished_at
+      FROM results
+      WHERE
+        user_id = ?
+        AND material_id IS NOT NULL
+      GROUP BY material_id
+    ) latest
+      ON latest.material_id = r.material_id
+      AND latest.latest_finished_at = r.finished_at
+    WHERE
+      r.user_id = ?
+      AND r.material_id IS NOT NULL
+    `,
+    [
+      id,
+      id
+    ]
+  );
+
+  const rates = {};
+
+  for (const row of rows) {
+    rates[row.material_id] =
+      Number(row.correct_rate || 0);
+  }
+
+  return rates;
+}
+
+/**
  * DBのmaterialsデータをフロント用へ変換する。
  */
 function toFrontMaterial(
   list,
-  questionCount = 0
+  questionCount = 0,
+  correctRate = null
 ) {
   return {
     id: list.material_id,
     userId: list.user_id,
     name: list.material_name,
 
-    // 表示用のカテゴリ名
     category:
       list.category_name || "未分類",
 
-    // DB上のカテゴリID
     categoryId:
       list.category_id === null ||
       list.category_id === undefined
@@ -81,6 +128,12 @@ function toFrontMaterial(
         : Number(list.category_id),
 
     questionCount,
+
+    correctRate:
+      correctRate === null ||
+      correctRate === undefined
+        ? null
+        : Number(correctRate),
 
     shared:
       Number(list.is_shared) === 1,
@@ -184,12 +237,21 @@ async function buildPayload(userId) {
       })
     );
 
+  const correctRates =
+    await getCorrectRatesByUserId(userId);
+
   const materials =
     materialPairs.map(
       ({ list, questions }) => {
         return toFrontMaterial(
           list,
-          questions.length
+          questions.length,
+          Object.prototype.hasOwnProperty.call(
+            correctRates,
+            list.material_id
+          )
+            ? correctRates[list.material_id]
+            : null
         );
       }
     );

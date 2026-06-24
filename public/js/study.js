@@ -23,8 +23,40 @@ async function loadStudyDataFromServer() {
       throw new Error(data.message || "学習データの取得に失敗しました");
     }
 
-    S.materials = Array.isArray(data.materials) ? data.materials : [];
-    S.questions = Array.isArray(data.questions) ? data.questions : [];
+    S.materials =
+      Array.isArray(data.materials)
+        ? data.materials
+        : [];
+
+    S.questions =
+      Array.isArray(data.questions)
+        ? data.questions
+        : [];
+
+    const correctRates =
+      data.correctRates || {};
+
+    S.materials = S.materials.map(material => {
+      const hasRate =
+        material.correctRate !== null &&
+        material.correctRate !== undefined
+          ? true
+          : Object.prototype.hasOwnProperty.call(
+              correctRates,
+              material.id
+            );
+
+      return {
+        ...material,
+        correctRate:
+          hasRate
+            ? Number(
+                material.correctRate ??
+                correctRates[material.id]
+              )
+            : null
+      };
+    });
 
     if (!S.studyFilter) {
       S.studyFilter = "すべて";
@@ -182,41 +214,88 @@ function renderQuestionSet() {
   `).join("");
 
   const cards = sets.length === 0
-    ? `
-      <div style="text-align:center;padding:60px 20px;color:var(--gray)">
-        <div class="empty-icon-wrap">${svg(IC.inbox,48)}</div>
-        <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
-          問題がありません
-        </div>
-        <div style="font-size:13px">
-          別のカテゴリを選ぶか資料を追加しましょう
-        </div>
+  ? `
+    <div style="text-align:center;padding:60px 20px;color:var(--gray)">
+      <div class="empty-icon-wrap">${svg(IC.inbox,48)}</div>
+      <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">
+        問題がありません
       </div>
-    `
-    : sets.map((x, i) => `
-      <div class="qset-card" onclick='startStudy(${JSON.stringify(x.qs.map(q => q.id))})'>
-        <div class="qset-icon color-${i % 6}">
-          ${icons[i % icons.length]}
-        </div>
+      <div style="font-size:13px">
+        別のカテゴリを選ぶか資料を追加しましょう
+      </div>
+    </div>
+  `
+  : sets.map((x, i) => {
+      const hasCorrectRate =
+        x.mat.correctRate !== null &&
+        x.mat.correctRate !== undefined &&
+        Number.isFinite(
+          Number(x.mat.correctRate)
+        );
 
-        <div class="qset-info">
-          <div class="qset-title">${esc(x.mat.name)}</div>
+      const correctRate =
+        hasCorrectRate
+          ? Math.max(
+              0,
+              Math.min(
+                100,
+                Number(x.mat.correctRate)
+              )
+            )
+          : null;
 
-          <div style="margin:3px 0">
-            <span class="tag tag-sky">演習</span>
-            <span class="tag tag-green">基礎</span>
+      return `
+        <div
+          class="qset-card"
+          onclick='startStudy(${JSON.stringify(x.qs.map(q => q.id))})'
+        >
+          <div class="qset-icon color-${i % 6}">
+            ${icons[i % icons.length]}
           </div>
 
-          <div class="qset-meta">
-            ${x.qs.length}問 ・ ${[...new Set(x.qs.map(q => q.category).filter(Boolean))].join("・") || "未分類"}
+          <div class="qset-info">
+            <div class="qset-title">
+              ${esc(x.mat.name)}
+            </div>
+
+            <div style="margin:3px 0">
+              <span class="tag tag-sky">
+                演習
+              </span>
+
+              <span class="tag tag-green">
+                ${
+                  hasCorrectRate
+                    ? `前回 ${correctRate}%`
+                    : "未挑戦"
+                }
+              </span>
+            </div>
+
+            <div class="qset-meta">
+              ${x.qs.length}問
+              ・
+              ${
+                [...new Set(
+                  x.qs
+                    .map(q => q.category)
+                    .filter(Boolean)
+                )].join("・") ||
+                "未分類"
+              }
+            </div>
+          </div>
+
+          <div class="qset-badge ${badges[i % badges.length]}">
+            ${
+              hasCorrectRate
+                ? `${correctRate}%`
+                : "－"
+            }
           </div>
         </div>
-
-        <div class="qset-badge ${badges[i % badges.length]}">
-          ${["A", "B", "C"][i % 3]}
-        </div>
-      </div>
-    `).join("");
+      `;
+    }).join("");
 
   return `
     <div class="screen-header blue-bg">
@@ -379,9 +458,57 @@ async function finishStudy() {
     finishedAt: new Date().toISOString()
   };
 
-  const savedResult = await saveStudyResultToServer(resultPayload);
-  const resultId = savedResult?.id || null;
+  const savedResult =
+    await saveStudyResultToServer(
+      resultPayload
+    );
 
+  const resultId =
+    savedResult?.id || null;
+
+  /*
+  * 保存した正答率を即時反映する。
+  */
+  if (
+    savedResult &&
+    savedResult.materialId
+  ) {
+    const materialId =
+      savedResult.materialId;
+
+    const correctRate =
+      Number(savedResult.pct || 0);
+
+    if (Array.isArray(S.materials)) {
+      S.materials = S.materials.map(material => {
+        if (material.id !== materialId) {
+          return material;
+        }
+
+        return {
+          ...material,
+          correctRate
+        };
+      });
+    }
+
+    if (
+      typeof homeCorrectRates !==
+      "undefined"
+    ) {
+      homeCorrectRates[materialId] =
+        correctRate;
+    }
+
+    if (
+      typeof homeCorrectRatesLoaded !==
+      "undefined"
+    ) {
+      homeCorrectRatesLoaded = true;
+    }
+
+    save();
+  }
   if (S.studySession) {
     S.studySession.resultId = resultId;
   }
