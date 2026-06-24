@@ -1,6 +1,8 @@
 const express = require("express");
 const { randomUUID } = require("crypto");
 const db = require("../DB/dbRoutes");
+const materialShareService =
+  require("./materialShareService");
 
 const router = express.Router();
 
@@ -119,6 +121,53 @@ router.get("/", async (req, res) => {
 });
 
 // ==================================================
+// POST /api/materials/share-codes/redeem
+// 公開中の問題セットを共有コードで受け取る
+// ==================================================
+router.post(
+  "/share-codes/redeem",
+  async (req, res) => {
+    try {
+      const userId = requireUserId(req, res);
+
+      if (!userId) {
+        return;
+      }
+
+      const copiedMaterial =
+        await materialShareService.receiveByCode({
+          code: req.body.code,
+          userId
+        });
+
+      const payload = await buildPayload(userId);
+
+      res.json({
+        ok: true,
+        message:
+          "問題セットを受け取りました",
+        copiedMaterial,
+        ...payload
+      });
+    } catch (err) {
+      console.error(
+        "POST /api/materials/share-codes/redeem error:",
+        err
+      );
+
+      res.status(
+        err.statusCode || 500
+      ).json({
+        ok: false,
+        message:
+          err.message ||
+          "問題セットの受け取りに失敗しました"
+      });
+    }
+  }
+);
+
+// ==================================================
 // GET /api/materials/:materialId
 // 自分の問題セットだけ詳細取得
 // ==================================================
@@ -221,41 +270,58 @@ router.delete("/:materialId", async (req, res) => {
 
 // ==================================================
 // PATCH /api/materials/:materialId/share
-// 自分の問題セットだけ公開・非公開切り替え
+// 公開・非公開切り替えと共有コードの発行・削除
 // ==================================================
-router.patch("/:materialId/share", async (req, res) => {
-  try {
-    const userId = requireUserId(req, res);
-    if (!userId) return;
+router.patch(
+  "/:materialId/share",
+  async (req, res) => {
+    try {
+      const userId = requireUserId(req, res);
 
-    const { materialId } = req.params;
+      if (!userId) {
+        return;
+      }
 
-    const list = await db.findQuestionListByIdAndUserId(materialId, userId);
+      const shared =
+        Boolean(req.body.shared);
 
-    if (!list) {
-      return res.status(404).json({
+      const result =
+        await materialShareService
+          .setShareStatus({
+            materialId:
+              req.params.materialId,
+            userId,
+            shared
+          });
+
+      const payload =
+        await buildPayload(userId);
+
+      res.json({
+        ok: true,
+        message: shared
+          ? "問題セットを公開しました"
+          : "問題セットを非公開にしました",
+        shareCode: result.shareCode,
+        ...payload
+      });
+    } catch (err) {
+      console.error(
+        "PATCH /api/materials/:materialId/share error:",
+        err
+      );
+
+      res.status(
+        err.statusCode || 500
+      ).json({
         ok: false,
-        message: "問題セットが見つからないか、管理権限がありません"
+        message:
+          err.message ||
+          "公開状態の更新に失敗しました"
       });
     }
-
-    await db.updateQuestionListShare(materialId, Boolean(req.body.shared));
-
-    const payload = await buildPayload(userId);
-
-    res.json({
-      ok: true,
-      ...payload
-    });
-  } catch (err) {
-    console.error("PATCH /api/materials/:materialId/share error:", err);
-
-    res.status(500).json({
-      ok: false,
-      message: err.message || "公開状態の更新に失敗しました"
-    });
   }
-});
+);
 
 // ==================================================
 // POST /api/materials/:materialId/questions
