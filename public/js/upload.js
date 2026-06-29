@@ -50,7 +50,13 @@ function renderUpload() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
         <span id="file-chosen-name"></span>
       </div>
-      <input type="file" id="file-input" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" style="display:none" onchange="onFileChosen(event)">
+      <input
+        type="file"
+        id="file-input"
+        accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg"
+        style="display:none"
+        onchange="onFileChosen(event)"
+      >
       <div class="form-group">
         <label class="form-label">資料名</label>
         <input class="form-input" id="material-name" type="text" placeholder="例：数学ノート 第3章">
@@ -91,23 +97,115 @@ function selectMethod(m) {
 
 function triggerFileSelect() { document.getElementById('file-input').click(); }
 
-async function startUpload() {
-  const name = document.getElementById('material-name').value.trim() || '無題の資料';
-  const cat  = document.getElementById('material-cat').value;
-
-  let base64Image = null;
-  if (selectedFile) {
-    base64Image = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result.split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(selectedFile);
-    });
-  }
-
-  navigate('analyzing', { materialId: uid(), name, category: cat, base64Image });
+function isImageFile(file) {
+  return Boolean(
+    file?.type?.startsWith(
+      "image/"
+    )
+  );
 }
 
+function isDocumentFile(file) {
+  const extension =
+    String(file?.name || "")
+      .toLowerCase()
+      .match(/\.[^.]+$/)?.[0];
+
+  return [
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".txt",
+    ".md"
+  ].includes(extension);
+}
+
+async function startUpload() {
+  const name =
+    document
+      .getElementById(
+        "material-name"
+      )
+      .value
+      .trim() ||
+    "無題の資料";
+
+  const cat =
+    document
+      .getElementById(
+        "material-cat"
+      )
+      .value;
+
+  if (!selectedFile) {
+    alert(
+      "ファイルを選択してください"
+    );
+
+    return;
+  }
+
+  let base64Image = null;
+  let documentFile = false;
+
+  /*
+   * 画像だけ既存のBase64 OCR処理を使う。
+   */
+  if (isImageFile(selectedFile)) {
+    base64Image =
+      await new Promise(
+        (resolve, reject) => {
+          const reader =
+            new FileReader();
+
+          reader.onload = event => {
+            resolve(
+              event.target.result
+                .split(",")[1]
+            );
+          };
+
+          reader.onerror =
+            reject;
+
+          reader.readAsDataURL(
+            selectedFile
+          );
+        }
+      );
+  } else if (
+    isDocumentFile(selectedFile)
+  ) {
+    /*
+     * PDF・WordはBase64にせず、
+     * documentRoutesへmultipart送信する。
+     */
+    documentFile = true;
+  } else {
+    alert(
+      "対応していないファイル形式です"
+    );
+
+    return;
+  }
+
+  navigate(
+    "analyzing",
+    {
+      materialId:
+        uid(),
+
+      name,
+
+      category:
+        cat,
+
+      base64Image,
+
+      documentFile
+    }
+  );
+}
 
 /* ============================================================
    AI解析中画面
@@ -130,121 +228,689 @@ function renderAnalyzing(params) {
     </div>`;
 }
 
-async function runAIAnalysis(params) {
-  const completeStep = (id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.classList.remove('active');
-    el.classList.add('done');
-    el.querySelector('.step-dot').style.background = 'var(--green)';
-  };
+async function waitDocumentGenerationJob(
+  jobId,
+  onUpdate
+) {
+  const intervalMs =
+    5000;
 
-  const activateStep = (id) => {
-    const el = document.getElementById(id);
-    if (el) el.classList.add('active');
-  };
+  const maxWaitMs =
+    60 * 60 * 1000;
 
-  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const startedAt =
+    Date.now();
 
-  try {
-    // Step 1: ファイル読み込み
-    activateStep('step1');
-    await delay(800);
-    completeStep('step1');
-
-    // Step 2: OCR（テキスト抽出）
-    activateStep('step2');
-    let extractedText = '';
-
-    if (params.base64Image) {
-      const ocrRes = await fetch('/api/AI/ocr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: params.base64Image })
-      });
-      console.log('OCR status:', ocrRes.status);
-      if (!ocrRes.ok) throw new Error('OCRに失敗しました');
-      const ocrData = await ocrRes.json();
-      console.log('OCR response:', ocrData);
-      extractedText = ocrData.text;
-    } else {
-      extractedText = params.name || '資料';
+  while (true) {
+    if (
+      Date.now() - startedAt >
+      maxWaitMs
+    ) {
+      throw new Error(
+        "AI問題生成の待機時間が長すぎます。時間をおいて再度確認してください。"
+      );
     }
 
-    completeStep('step2');
-    console.log('OCR抽出テキスト:', extractedText);
+    const response =
+      await fetch(
+        `/api/documents/jobs/${encodeURIComponent(jobId)}`
+      );
 
-    // Step 3: 問題生成
-    activateStep('step3');
-    const genRes = await fetch('/api/AI/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: extractedText,
-        userId: S.user?.userId || S.user?.id,
-        materialName: params.name || "生成された問題セット",
-        categoryName: params.category || "一般"
-      })
+    const data =
+      await response.json();
+
+    if (
+      !response.ok ||
+      !data.ok
+    ) {
+      throw new Error(
+        data.message ||
+        "問題生成ジョブの確認に失敗しました"
+      );
+    }
+
+    const job =
+      data.job;
+
+    if (
+      typeof onUpdate === "function"
+    ) {
+      onUpdate(job);
+    }
+
+    if (
+      job.status === "completed"
+    ) {
+      if (
+        !job.result ||
+        !job.result.ok
+      ) {
+        throw new Error(
+          "問題生成結果を取得できませんでした"
+        );
+      }
+
+      return job.result;
+    }
+
+    if (
+      job.status === "failed"
+    ) {
+      throw new Error(
+        job.error ||
+        "問題生成に失敗しました"
+      );
+    }
+
+    await new Promise(resolve => {
+      setTimeout(
+        resolve,
+        intervalMs
+      );
     });
+  }
+}
 
-    const genText = await genRes.text();
-    console.log('generate status:', genRes.status);
-    console.log('generate response:', genText);
+async function runAIAnalysis(
+  params
+) {
+  const completeStep = id => {
+    const element =
+      document.getElementById(id);
 
-    if (!genRes.ok) throw new Error(`問題生成に失敗しました: ${genText}`);
-    const genData = JSON.parse(genText);
-    completeStep('step3');
+    if (!element) {
+      return;
+    }
 
-    // Step 4: 問題セット作成
-    activateStep('step4');
-    await delay(600);
-    completeStep('step4');
+    element.classList.remove(
+      "active"
+    );
 
-    finishAnalysis(params, genData.questions);
+    element.classList.add(
+      "done"
+    );
 
-  } catch (err) {
-    console.error('AI解析エラー:', err);
-    const sub = document.querySelector('.analyzing-sub');
+    const dot =
+      element.querySelector(
+        ".step-dot"
+      );
+
+    if (dot) {
+      dot.style.background =
+        "var(--green)";
+    }
+  };
+
+  const activateStep = id => {
+    const element =
+      document.getElementById(id);
+
+    if (element) {
+      element.classList.add(
+        "active"
+      );
+    }
+  };
+
+  const setAnalyzingMessage = message => {
+    const sub =
+      document.querySelector(
+        ".analyzing-sub"
+      );
+
     if (sub) {
-      sub.textContent = `エラー: ${err.message}`;
-      sub.style.color = 'var(--red, #e53e3e)';
+      sub.textContent =
+        message;
+    }
+  };
+
+  const delay = ms => {
+    return new Promise(
+      resolve => {
+        setTimeout(
+          resolve,
+          ms
+        );
+      }
+    );
+  };
+
+  try {
+    if (!selectedFile) {
+      throw new Error(
+        "解析対象のファイルが見つかりません"
+      );
+    }
+
+    const userId =
+      S.user?.userId ||
+      S.user?.user_id ||
+      S.user?.id ||
+      "";
+
+    if (!userId) {
+      throw new Error(
+        "ログインユーザーが確認できません"
+      );
+    }
+
+    activateStep("step1");
+
+    await delay(300);
+
+    completeStep("step1");
+
+    let generateData;
+
+    // ==================================================
+    // PDF・Word・TXT・MD
+    // 複数人利用前提:
+    // /api/documents/generate は jobId を返す。
+    // その後 /api/documents/jobs/:jobId をポーリングする。
+    // ==================================================
+    if (
+      isDocumentFile(
+        selectedFile
+      )
+    ) {
+      activateStep("step2");
+
+      setAnalyzingMessage(
+        "文書から本文を抽出しています..."
+      );
+
+      const formData =
+        new FormData();
+
+      formData.append(
+        "file",
+        selectedFile,
+        selectedFile.name
+      );
+
+      formData.append(
+        "userId",
+        userId
+      );
+
+      formData.append(
+        "materialName",
+        params.name ||
+        "生成された問題セット"
+      );
+
+      formData.append(
+        "categoryName",
+        params.category ||
+        "一般"
+      );
+
+      const response =
+        await fetch(
+          "/api/documents/generate",
+          {
+            method: "POST",
+            body:
+              formData
+          }
+        );
+
+      const responseText =
+        await response.text();
+
+      let queueData;
+
+      try {
+        queueData =
+          JSON.parse(
+            responseText
+          );
+      } catch {
+        throw new Error(
+          "PDF・Word問題生成APIの応答を解析できませんでした: " +
+          responseText
+        );
+      }
+
+      if (
+        !response.ok ||
+        !queueData.ok
+      ) {
+        throw new Error(
+          queueData.message ||
+          queueData.error ||
+          "PDF・Wordから問題生成ジョブを作成できませんでした"
+        );
+      }
+
+      completeStep("step2");
+      activateStep("step3");
+
+      if (!queueData.jobId) {
+        throw new Error(
+          "問題生成ジョブIDを取得できませんでした"
+        );
+      }
+
+      setAnalyzingMessage(
+        queueData.queuePosition > 1
+          ? `AI生成の順番待ちです（${queueData.queuePosition}番目）...`
+          : "AIが問題を生成しています..."
+      );
+
+      generateData =
+        await waitDocumentGenerationJob(
+          queueData.jobId,
+          job => {
+            if (!job) {
+              return;
+            }
+
+            if (
+              job.status === "queued"
+            ) {
+              setAnalyzingMessage(
+                job.queuePosition > 1
+                  ? `AI生成の順番待ちです（${job.queuePosition}番目）...`
+                  : "AI生成の順番待ちです..."
+              );
+            } else if (
+              job.status === "running"
+            ) {
+              setAnalyzingMessage(
+                "AIが問題を生成しています。時間がかかる場合があります..."
+              );
+            }
+          }
+        );
+
+      completeStep("step3");
+
+      console.log(
+        "PDF・WordからAIへ渡された文章:",
+        {
+          fileName:
+            generateData
+              .document
+              ?.fileName,
+
+          method:
+            generateData
+              .document
+              ?.method,
+
+          originalLength:
+            generateData
+              .document
+              ?.originalLength,
+
+          sentLength:
+            generateData
+              .document
+              ?.sentLength,
+
+          preview:
+            generateData
+              .document
+              ?.preview,
+
+          materialId:
+            generateData.materialId
+        }
+      );
+
+    // ==================================================
+    // 画像
+    // 画像は既存処理をそのまま使用。
+    // ==================================================
+    } else if (
+      isImageFile(
+        selectedFile
+      )
+    ) {
+      activateStep("step2");
+
+      let base64Image =
+        params.base64Image ||
+        "";
+
+      if (!base64Image) {
+        base64Image =
+          await new Promise(
+            (
+              resolve,
+              reject
+            ) => {
+              const reader =
+                new FileReader();
+
+              reader.onload =
+                event => {
+                  resolve(
+                    event.target
+                      .result
+                      .split(",")[1]
+                  );
+                };
+
+              reader.onerror =
+                reject;
+
+              reader.readAsDataURL(
+                selectedFile
+              );
+            }
+          );
+      }
+
+      const ocrResponse =
+        await fetch(
+          "/api/AI/ocr",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify({
+                image:
+                  base64Image
+              })
+          }
+        );
+
+      const ocrText =
+        await ocrResponse.text();
+
+      let ocrData;
+
+      try {
+        ocrData =
+          JSON.parse(
+            ocrText
+          );
+      } catch {
+        throw new Error(
+          "画像OCRの応答を解析できませんでした: " +
+          ocrText
+        );
+      }
+
+      if (
+        !ocrResponse.ok ||
+        !ocrData.ok
+      ) {
+        throw new Error(
+          ocrData.error ||
+          "画像OCRに失敗しました"
+        );
+      }
+
+      const extractedText =
+        String(
+          ocrData.text || ""
+        ).trim();
+
+      if (
+        extractedText.length < 20
+      ) {
+        throw new Error(
+          "画像から十分な文章を読み取れませんでした"
+        );
+      }
+
+      completeStep("step2");
+      activateStep("step3");
+
+      setAnalyzingMessage(
+        "AIが問題を生成しています..."
+      );
+
+      const generateResponse =
+        await fetch(
+          "/api/AI/generate",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify({
+                text:
+                  extractedText,
+
+                userId,
+
+                materialName:
+                  params.name ||
+                  "生成された問題セット",
+
+                categoryName:
+                  params.category ||
+                  "一般"
+              })
+          }
+        );
+
+      const generateText =
+        await generateResponse.text();
+
+      try {
+        generateData =
+          JSON.parse(
+            generateText
+          );
+      } catch {
+        throw new Error(
+          "問題生成APIの応答を解析できませんでした: " +
+          generateText
+        );
+      }
+
+      if (
+        !generateResponse.ok ||
+        !generateData.ok
+      ) {
+        throw new Error(
+          generateData.error ||
+          "画像から問題を生成できませんでした"
+        );
+      }
+
+      completeStep("step3");
+    } else {
+      throw new Error(
+        "対応していないファイル形式です"
+      );
+    }
+
+    activateStep("step4");
+
+    await finishAnalysis(
+      params,
+      generateData
+    );
+
+    completeStep("step4");
+  } catch (error) {
+    console.error(
+      "AI解析エラー:",
+      error
+    );
+
+    const sub =
+      document.querySelector(
+        ".analyzing-sub"
+      );
+
+    if (sub) {
+      sub.textContent =
+        `エラー: ${error.message}`;
+
+      sub.style.color =
+        "var(--red, #e53e3e)";
     }
   }
 }
 
-function finishAnalysis(params, apiQuestions) {
-  const { materialId, name, category } = params;
+async function finishAnalysis(
+  params,
+  generateData
+) {
+  /*
+   * aiRoutes.jsがDBへ保存した
+   * 正式なmaterialIdを使う。
+   */
+  const materialId =
+    generateData?.materialId;
 
-  S.materials.push({
-    id: materialId,
-    name: name || '無題の資料',
-    type: uploadMethod,
-    filename: name,
-    createdAt: new Date().toISOString(),
-    questionCount: apiQuestions?.length || 0,
-    shared: false,
-  });
-
-  if (apiQuestions?.length > 0) {
-    const newQs = apiQuestions.map((q, i) => ({
-      id: `${materialId}_${i}`,
-      materialId,
-      category: category || q.category || '一般',
-      tags: q.tags || [],
-      text: q.text,
-      // ★ choices が文字列で来た場合も配列に変換
-      choices: Array.isArray(q.choices)
-        ? q.choices
-        : typeof q.choices === 'string'
-          ? JSON.parse(q.choices)
-          : [],
-      correct: q.correct ?? 0,
-      explanation: q.explanation || '',
-      createdAt: new Date().toISOString(),
-    }));
-    S.questions.push(...newQs);
+  if (!materialId) {
+    throw new Error(
+      "生成された問題セットIDを取得できませんでした"
+    );
   }
 
+  /*
+   * サーバー側ですでにDBへ保存されているため、
+   * 基本的にはDBから再取得する。
+   */
+  if (
+    typeof materialsLoaded !==
+    "undefined"
+  ) {
+    materialsLoaded = false;
+  }
+
+  if (
+    typeof studyLoaded !==
+    "undefined"
+  ) {
+    studyLoaded = false;
+  }
+
+  if (
+    typeof loadMaterialsFromServer ===
+    "function"
+  ) {
+    await loadMaterialsFromServer(
+      true
+    );
+  } else {
+    /*
+     * DB再取得関数がない場合のみ、
+     * 画面表示用のデータを追加する。
+     *
+     * 仮IDではなく、DBの正式IDを使用する。
+     */
+    const exists =
+      S.materials.some(
+        material =>
+          material.id ===
+          materialId
+      );
+
+    if (!exists) {
+      S.materials.push({
+        id:
+          materialId,
+
+        name:
+          params.name ||
+          "無題の資料",
+
+        type:
+          uploadMethod,
+
+        filename:
+          selectedFile?.name ||
+          params.name,
+
+        createdAt:
+          new Date()
+            .toISOString(),
+
+        questionCount:
+          generateData
+            .questions
+            ?.length ||
+          0,
+
+        shared:
+          false
+      });
+    }
+
+    const newQuestions =
+      Array.isArray(
+        generateData.questions
+      )
+        ? generateData.questions
+        : [];
+
+    for (
+      let index = 0;
+      index <
+      newQuestions.length;
+      index++
+    ) {
+      const question =
+        newQuestions[index];
+
+      S.questions.push({
+        id:
+          `${materialId}_${index}`,
+
+        materialId,
+
+        category:
+          params.category ||
+          "一般",
+
+        tags:
+          question.tags ||
+          [],
+
+        text:
+          question.text,
+
+        choices:
+          Array.isArray(
+            question.choices
+          )
+            ? question.choices
+            : [],
+
+        correct:
+          question.correct ??
+          0,
+
+        explanation:
+          question.explanation ||
+          "",
+
+        createdAt:
+          new Date()
+            .toISOString()
+      });
+    }
+  }
+
+  selectedFile = null;
+
   save();
-  setTimeout(() => navigate('materials', { materialId }), 500);
+
+  setTimeout(() => {
+    navigate(
+      "materials",
+      {
+        materialId
+      }
+    );
+  }, 300);
 }
