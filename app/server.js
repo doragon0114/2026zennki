@@ -11,6 +11,7 @@ const pageRoutes = require("./routes/pageRoutes");
 const ollamaRoutes = require("./ollama/ollamaRoutes");
 const studyRoutes = require("./features/study/studyRoutes");
 const aiRoutes = require("./features/AI/aiRoutes");  // 追加
+const documentRoutes = require("./features/AI/documentRoutes");
 const materialsRoutes = require("./features/materials/materialsRoutes");
 const battleHistoryRoutes = require("./features/battle/battleHistoryRoutes");
 const calendarRoutes = require("./features/calendar/calendarRoutes");
@@ -59,6 +60,7 @@ if (process.env.ENABLE_OLLAMA_TOOLS !== "false") {
 // AI解析API（OCR・問題生成）  // 追加
 app.use("/api/AI", aiRoutes);
 
+app.use("/api/documents", documentRoutes);
 // サーバー確認
 app.get("/api/health", (req, res) => {
   res.json({
