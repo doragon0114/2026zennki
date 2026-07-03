@@ -31,27 +31,17 @@ async function refreshMyPageUserFromServer() {
   myPageUserRefreshing = true;
 
   try {
-    const response = await fetch("/api/auth/me");
+    const response = await fetch("/api/auth/me", {
+      cache: "no-store"
+    });
+
     const data = await response.json();
 
     if (!response.ok || !data.ok || !data.user) {
       return false;
     }
 
-    const avatar = getCurrentAvatar();
-
-    if (typeof applyAuthUser === "function") {
-      applyAuthUser(data.user);
-      S.user.avatar = avatar;
-      localStorage.setItem("revino_avatar", avatar);
-      save();
-    } else {
-      S.user = {
-        ...S.user,
-        ...data.user
-      };
-      save();
-    }
+    applyProfileUser(data.user);
 
     return true;
   } catch {
@@ -260,7 +250,6 @@ async function doLogout() {
     localStorage.removeItem("pz_user");
     localStorage.removeItem("pz_materials");
     localStorage.removeItem("pz_questions");
-    localStorage.removeItem("revino_avatar");
 
     navigate("login");
   }
@@ -276,10 +265,10 @@ const AVATARS=['🐧','🦊','🐻','🐱','🐼','🦋','🦁','🐸','🐯','�
 let profileEditTags = [];
 
 function getCurrentAvatar() {
-  return localStorage.getItem("revino_avatar") || S.user?.avatar || "🐧";
+  return S.user?.avatar || "🐧";
 }
 
-function applyProfileUser(user, avatar) {
+function applyProfileUser(user) {
   if (typeof applyAuthUser === "function") {
     applyAuthUser(user);
   } else {
@@ -291,10 +280,11 @@ function applyProfileUser(user, avatar) {
     S.user = {
       ...S.user,
       userId: user.userId,
-      name: user.username,
-      username: user.username,
+      name: user.username || user.name,
+      username: user.username || user.name,
       email: user.email,
       profile: user.profile || "",
+      avatar: user.avatar || "🐧",
       userTags: Array.isArray(user.userTags) ? user.userTags : [],
 
       point,
@@ -308,8 +298,8 @@ function applyProfileUser(user, avatar) {
     };
   }
 
-  S.user.avatar = avatar || getCurrentAvatar();
-  localStorage.setItem("revino_avatar", S.user.avatar);
+  S.user.avatar = user.avatar || S.user.avatar || "🐧";
+
   save();
 }
 
@@ -548,6 +538,7 @@ async function saveProfile() {
         username: name,
         email,
         profile,
+        avatar,
         userTags: profileEditTags
       })
     });
@@ -559,7 +550,7 @@ async function saveProfile() {
       return;
     }
 
-    applyProfileUser(data.user, avatar);
+    applyProfileUser(data.user);
 
     showProfileMessage("保存しました", "success");
 

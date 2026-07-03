@@ -131,6 +131,29 @@ function normalizeUserTags(userTags) {
   return uniqueTags;
 }
 
+const ALLOWED_AVATARS = [
+  "🐧",
+  "🦊",
+  "🐻",
+  "🐱",
+  "🐼",
+  "🦋",
+  "🦁",
+  "🐸",
+  "🐯",
+  "🦄",
+  "🐮",
+  "🐺"
+];
+
+function normalizeAvatar(avatar) {
+  const value = String(avatar || "").trim();
+
+  return ALLOWED_AVATARS.includes(value)
+    ? value
+    : "🐧";
+}
+
 /* ============================================================
    user_tags 処理
    今回は中間テーブルなし。
@@ -207,6 +230,7 @@ async function toPublicUser(userRow) {
     userId: userRow.userId,
     username: userRow.username,
     profile: userRow.profile || "",
+    avatar: userRow.avatar || "🐧",
     userTags,
     email: userRow.email,
 
@@ -234,7 +258,8 @@ async function createUser({
   profile,
   userTags,
   email,
-  password
+  password,
+  avatar
 }) {
   validateUserInput({
     username,
@@ -276,11 +301,12 @@ async function createUser({
           email,
           password_hash,
           salt,
+          avater,
           created_at,
           updated_at
         )
       VALUES
-        (?, ?, ?, ?, ?, ?, NOW(), NOW())
+        (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `,
       [
         userId,
@@ -288,7 +314,8 @@ async function createUser({
         profile ? profile.trim() : "",
         normalizedEmail,
         passwordHash,
-        salt
+        salt,
+        normalizeAvatar(avatar)
       ]
     );
 
@@ -324,6 +351,7 @@ async function loginUser({ loginId, password }) {
       username,
       profile,
       email,
+      avater AS avatar,
       password_hash AS passwordHash,
       salt,
       point,
@@ -370,6 +398,7 @@ async function findPublicUserByUserId(userId) {
       profile,
       email,
       point,
+      avater AS avatar,
       battle_win_count AS battleWinCount,
       study_count AS studyCount,
       question_count AS questionCount,
@@ -392,7 +421,8 @@ async function updateUserProfile(currentUserId, {
   username,
   profile,
   userTags,
-  email
+  email,
+  avatar
 }) {
   validateProfileInput({
     username,
@@ -445,6 +475,7 @@ async function updateUserProfile(currentUserId, {
         username = ?,
         profile = ?,
         email = ?,
+        avater = ?,
         updated_at = NOW()
       WHERE user_id = ?
       `,
@@ -452,6 +483,7 @@ async function updateUserProfile(currentUserId, {
         username.trim(),
         profile ? profile.trim() : "",
         normalizedEmail,
+        normalizeAvatar(avatar),
         currentUserId
       ]
     );

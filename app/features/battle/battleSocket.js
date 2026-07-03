@@ -24,6 +24,29 @@ function createId(prefix) {
   return `${prefix}_${crypto.randomBytes(5).toString("hex")}`;
 }
 
+async function findBattleUserById(userId) {
+  const id = String(userId || "").trim();
+
+  if (!id) {
+    return null;
+  }
+
+  const [rows] = await db.query(
+    `
+    SELECT
+      user_id AS userId,
+      username,
+      COALESCE(NULLIF(avater, ''), '🐧') AS avatar
+    FROM users
+    WHERE user_id = ?
+    LIMIT 1
+    `,
+    [id]
+  );
+
+  return rows[0] || null;
+}
+
 function send(ws, type, payload = {}) {
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     return;
@@ -114,10 +137,8 @@ async function handleMessage(player, data) {
 }
 
 async function handleJoin(player, data) {
-  player.name = String(data.name || "ゲスト").trim().slice(0, 20);
   player.age = Number(data.age || 15);
   player.subject = data.subject || "math";
-  player.avatar = data.avatar || "🐧";
   player.userId = String(data.userId || "").trim();
 
   if (!player.userId) {
@@ -126,6 +147,21 @@ async function handleJoin(player, data) {
     });
     return;
   }
+
+  const dbUser = await findBattleUserById(player.userId);
+
+  if (!dbUser) {
+    send(player.ws, "error", {
+      message: "ユーザー情報が見つからないため、対戦できません。"
+    });
+    return;
+  }
+
+  player.name = String(dbUser.username || data.name || "ゲスト")
+    .trim()
+    .slice(0, 20);
+
+  player.avatar = dbUser.avatar || "🐧";
 
   if (!Number.isInteger(player.age) || player.age < 1 || player.age > 120) {
     send(player.ws, "error", {
@@ -161,13 +197,18 @@ async function handleJoin(player, data) {
   send(player.ws, "joined", {
     playerId: player.id,
     name: player.name,
+    avatar: player.avatar,
     age: player.age,
     subject: player.subject,
     subjectLabel,
     ownQuestionCount: ownCheck.count
   });
 
-  if (waiting && waiting.ws.readyState === WebSocket.OPEN && waiting.id !== player.id) {
+  if (
+    waiting &&
+    waiting.ws.readyState === WebSocket.OPEN &&
+    waiting.id !== player.id
+  ) {
     waitingPlayers.delete(key);
     await createRoom(waiting, player);
     return;
