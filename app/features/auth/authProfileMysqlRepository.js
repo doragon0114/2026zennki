@@ -5,6 +5,29 @@ function createRandomId(prefix, byteLength = 4) {
   return `${prefix}_${crypto.randomBytes(byteLength).toString("hex")}`;
 }
 
+const ALLOWED_AVATARS = [
+  "🐧",
+  "🦊",
+  "🐻",
+  "🐱",
+  "🐼",
+  "🦋",
+  "🦁",
+  "🐸",
+  "🐯",
+  "🦄",
+  "🐮",
+  "🐺"
+];
+
+function normalizeAvatar(avatar) {
+  const value = String(avatar || "").trim();
+
+  return ALLOWED_AVATARS.includes(value)
+    ? value
+    : "🐧";
+}
+
 async function createUniqueTagId(connection) {
   while (true) {
     const tagId = createRandomId("tag", 4);
@@ -165,6 +188,7 @@ async function toPublicUser(userRow) {
     userId: userRow.userId,
     username: userRow.username,
     profile: userRow.profile || "",
+    avatar: userRow.avatar || "🐧",
     userTags,
     email: userRow.email,
     createdAt: userRow.createdAt
@@ -178,6 +202,7 @@ async function findPublicUserByUserId(userId) {
       user_id AS userId,
       username,
       profile,
+      avater AS avatar,
       user_tag_ids_json AS userTagIdsJson,
       email,
       created_at AS createdAt
@@ -195,7 +220,8 @@ async function updateUserProfile(currentUserId, {
   username,
   profile,
   userTags,
-  email
+  email,
+  avatar
 }) {
   validateProfileInput({
     username,
@@ -253,6 +279,7 @@ async function updateUserProfile(currentUserId, {
         profile = ?,
         user_tag_ids_json = ?,
         email = ?,
+        avater = ?,
         updated_at = NOW()
       WHERE user_id = ?
       `,
@@ -261,6 +288,7 @@ async function updateUserProfile(currentUserId, {
         profile ? profile.trim() : "",
         JSON.stringify(userTagIds),
         normalizedEmail,
+        normalizeAvatar(avatar),
         currentUserId
       ]
     );

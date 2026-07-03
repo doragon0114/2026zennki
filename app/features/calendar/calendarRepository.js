@@ -162,7 +162,7 @@ async function getRankingByPoint({
     SELECT
       user_id AS userId,
       username,
-      avater AS avatar,
+      COALESCE(NULLIF(avater, ''), '🐧') AS avatar,
       point,
       battle_win_count AS battleWinCount,
       study_count AS studyCount,
@@ -204,7 +204,7 @@ async function getRankingByPoint({
     SELECT
       user_id AS userId,
       username,
-      avater AS avatar,
+      COALESCE(NULLIF(avater, ''), '🐧') AS avatar,
       point,
       battle_win_count AS battleWinCount,
       study_count AS studyCount,
