@@ -540,7 +540,7 @@ function renderBattle() {
       <div class="battle-status-bar">
         <div class="battle-q-label">Q${current+1} <span class="bql-total">/ ${questions.length}</span></div>
         <div class="battle-in-progress">対戦中</div>
-        <div class="battle-timer-pill" id="battle-timer">15</div>
+        <div class="battle-timer-pill" id="battle-timer">20</div>
       </div>
 
       <div class="battle-scores-section">
