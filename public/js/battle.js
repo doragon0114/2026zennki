@@ -310,8 +310,8 @@ let battleHistoryLoaded = false;
 let battleHistoryLoading = false;
 let battleHistoryItems = [];
 
-const BATTLE_POINT_WIN = 30;
-const BATTLE_POINT_DRAW = 10;
+const BATTLE_POINT_WIN = 150;
+const BATTLE_POINT_DRAW = 50;
 
 const BATTLE_SUBJECT_LABELS = {
   japanese: "国語",
