@@ -23,9 +23,15 @@
 function renderBattleStart() {
   const savedSubject = localStorage.getItem("revino_battle_subject") || "math";
   const savedAge = localStorage.getItem("revino_battle_age") || "15";
+  const savedMatchMode = localStorage.getItem("revino_battle_match_mode") || "public";
+  const savedPasscode = localStorage.getItem("revino_battle_passcode") || "";
 
   const option = (value, label) => {
     return `<option value="${value}" ${savedSubject === value ? "selected" : ""}>${label}</option>`;
+  };
+
+  const modeOption = (value, label) => {
+    return `<option value="${value}" ${savedMatchMode === value ? "selected" : ""}>${label}</option>`;
   };
 
   return `
@@ -51,7 +57,7 @@ function renderBattleStart() {
       <div class="battle-start-title">対戦モード</div>
       <div class="battle-start-desc">
         5問4択で他のユーザーと対戦！<br>
-        正解数を競い、ポイントを獲得しよう。
+        通常対戦か、パスコード対戦を選べます。
       </div>
 
       <div class="battle-start-info">
@@ -74,7 +80,7 @@ function renderBattleStart() {
               <polyline points="12 7 12 12 15 14"/>
             </svg>
           </div>
-          <span>制限時間：15秒／問</span>
+          <span>制限時間：20秒／問</span>
         </div>
 
         <div class="battle-start-info-row">
@@ -88,6 +94,51 @@ function renderBattleStart() {
             </svg>
           </div>
           <span>勝利：+${BATTLE_POINT_WIN}pt　引き分け：+${BATTLE_POINT_DRAW}pt</span>
+        </div>
+
+        <div class="battle-start-info-row">
+          <div class="info-icon">
+            ${svg(IC.swords, 18)}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:900;margin-bottom:6px">対戦方式</div>
+            <select
+              id="battle-match-mode"
+              class="form-input"
+              onchange="saveBattleSettings(); updateBattlePasscodeView();"
+            >
+              ${modeOption("public", "通常マッチング")}
+              ${modeOption("private", "パスコード対戦")}
+            </select>
+            <div style="font-size:11px;color:var(--gray);margin-top:6px;line-height:1.5">
+              パスコード対戦は、同じパスコードを入力した人同士だけでマッチします。
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="battle-start-info-row"
+          id="battle-passcode-row"
+          style="${savedMatchMode === "private" ? "" : "display:none"}"
+        >
+          <div class="info-icon">
+            ${svg(IC.lock, 18)}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:900;margin-bottom:6px">パスコード</div>
+            <input
+              id="battle-passcode"
+              class="form-input"
+              type="text"
+              maxlength="20"
+              value="${esc(savedPasscode)}"
+              placeholder="例：REVINO123"
+              oninput="saveBattleSettings()"
+            >
+            <div style="font-size:11px;color:var(--gray);margin-top:6px;line-height:1.5">
+              友達と同じパスコードを入力してください。
+            </div>
+          </div>
         </div>
 
         <div class="battle-start-info-row">
@@ -121,6 +172,9 @@ function renderBattleStart() {
               value="${esc(savedAge)}"
               onchange="saveBattleSettings()"
             >
+            <div style="font-size:11px;color:var(--gray);margin-top:6px;line-height:1.5">
+              通常マッチングでは、教科と年齢が同じ人とマッチします。
+            </div>
           </div>
         </div>
       </div>
@@ -140,12 +194,18 @@ function renderBattleStart() {
     </div>`;
 }
 
-
 /* ============================================================
    対戦マッチング画面
    3.5秒後にランダムで相手を選び対戦を開始する
 ============================================================ */
 function renderBattleMatching() {
+  const matchMode = getBattleMatchMode();
+  const passcode = getBattlePasscode();
+
+  const modeText = matchMode === "private"
+    ? `パスコード対戦：${passcode || "未入力"}`
+    : "通常マッチング";
+
   return `
     <div class="screen-header">
       <button class="back-btn" onclick="cancelBattleMatching()"></button>
@@ -177,6 +237,10 @@ function renderBattleMatching() {
         対戦相手を探しています<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
       </div>
 
+      <div style="font-size:12px;font-weight:900;color:var(--dark);margin-bottom:8px">
+        ${esc(modeText)}
+      </div>
+
       <div id="battle-matching-status" class="battle-status-message">
         サーバーに接続しています。
       </div>
@@ -194,12 +258,24 @@ async function runMatchmaking() {
 
     const subject = getBattleSubject();
     const age = getBattleAge();
+    const matchMode = getBattleMatchMode();
+    const passcode = getBattlePasscode();
 
-    updateBattleMatchingStatus(`${BATTLE_SUBJECT_LABELS[subject]} / ${age}歳で接続中です。`);
+    if (matchMode === "private" && !passcode) {
+      alert("パスコード対戦ではパスコードを入力してください。");
+      navigate("battle-start");
+      return;
+    }
+
+    const modeLabel = matchMode === "private"
+      ? `パスコード対戦「${passcode}」`
+      : `${BATTLE_SUBJECT_LABELS[subject]} / ${age}歳`;
+
+    updateBattleMatchingStatus(`${modeLabel}で接続中です。`);
 
     await getBattleSocket();
 
-    updateBattleMatchingStatus(`${BATTLE_SUBJECT_LABELS[subject]} / ${age}歳で相手を探しています。`);
+    updateBattleMatchingStatus(`${modeLabel}で相手を探しています。`);
 
     const userId = S.user?.userId || S.user?.id;
 
@@ -215,6 +291,8 @@ async function runMatchmaking() {
       name: S.user.name || S.user.username || "ゲスト",
       age,
       subject,
+      matchMode,
+      passcode,
       avatar: S.user.avatar || "🐧"
     });
   } catch {
@@ -232,8 +310,8 @@ let battleHistoryLoaded = false;
 let battleHistoryLoading = false;
 let battleHistoryItems = [];
 
-const BATTLE_POINT_WIN = 30;
-const BATTLE_POINT_DRAW = 10;
+const BATTLE_POINT_WIN = 150;
+const BATTLE_POINT_DRAW = 50;
 
 const BATTLE_SUBJECT_LABELS = {
   japanese: "国語",
@@ -309,6 +387,38 @@ function getBattleSubject() {
   return el ? el.value : localStorage.getItem("revino_battle_subject") || "math";
 }
 
+function getBattleMatchMode() {
+  const el = document.getElementById("battle-match-mode");
+  const value = el ? el.value : localStorage.getItem("revino_battle_match_mode") || "public";
+
+  return value === "private" ? "private" : "public";
+}
+
+function normalizeBattlePasscode(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 20);
+}
+
+function getBattlePasscode() {
+  const el = document.getElementById("battle-passcode");
+  const value = el ? el.value : localStorage.getItem("revino_battle_passcode") || "";
+
+  return normalizeBattlePasscode(value);
+}
+
+function updateBattlePasscodeView() {
+  const row = document.getElementById("battle-passcode-row");
+
+  if (!row) {
+    return;
+  }
+
+  row.style.display = getBattleMatchMode() === "private" ? "" : "none";
+}
+
 function getBattleAge() {
   const el = document.getElementById("battle-age");
   const value = el ? Number(el.value) : Number(localStorage.getItem("revino_battle_age") || 15);
@@ -323,6 +433,8 @@ function getBattleAge() {
 function saveBattleSettings() {
   localStorage.setItem("revino_battle_subject", getBattleSubject());
   localStorage.setItem("revino_battle_age", String(getBattleAge()));
+  localStorage.setItem("revino_battle_match_mode", getBattleMatchMode());
+  localStorage.setItem("revino_battle_passcode", getBattlePasscode());
 }
 
 function closeBattleSocket() {
@@ -428,7 +540,7 @@ function renderBattle() {
       <div class="battle-status-bar">
         <div class="battle-q-label">Q${current+1} <span class="bql-total">/ ${questions.length}</span></div>
         <div class="battle-in-progress">対戦中</div>
-        <div class="battle-timer-pill" id="battle-timer">15</div>
+        <div class="battle-timer-pill" id="battle-timer">20</div>
       </div>
 
       <div class="battle-scores-section">
@@ -824,9 +936,15 @@ function handleBattleServerMessage(data) {
       break;
 
     case "joined":
-      updateBattleMatchingStatus(
-        `${data.subjectLabel || ""} / ${data.age || ""}歳で相手を探しています。`
-      );
+      if (data.matchMode === "private") {
+        updateBattleMatchingStatus(
+          `${data.subjectLabel || ""} / パスコード「${data.passcode || ""}」で相手を探しています。`
+        );
+      } else {
+        updateBattleMatchingStatus(
+          `${data.subjectLabel || ""} / ${data.age || ""}歳で相手を探しています。`
+        );
+      }
       break;
 
     case "waiting":
