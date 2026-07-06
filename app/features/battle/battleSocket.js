@@ -16,9 +16,9 @@ const waitingPlayers = new Map();
 const playerRooms = new Map();
 const activeRooms = new Map();
 
-const BATTLE_POINT_WIN = 30;
-const BATTLE_POINT_DRAW = 10;
-const BATTLE_TIME_LIMIT = 15;
+const BATTLE_POINT_WIN = 150;
+const BATTLE_POINT_DRAW = 50;
+const BATTLE_TIME_LIMIT = 20;
 
 function createId(prefix) {
   return `${prefix}_${crypto.randomBytes(5).toString("hex")}`;
