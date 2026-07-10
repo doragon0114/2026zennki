@@ -476,6 +476,21 @@ function renderHome() {
           <div class="learn-shortcut-arrow">›</div>
         </div>
       </div>
+      <div class="learn-shortcut-row">
+        <div class="learn-shortcut-card" onclick="navigate('character-growth')">
+          <div class="learn-shortcut-icon blue">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 16.8 6.2 20l1.1-6.5-4.7-4.6 6.5-.9L12 2z"/>
+              <path d="M9 12h6"/>
+              <path d="M12 9v6"/>
+            </svg>
+          </div>
+          <div class="learn-shortcut-label">成長モード</div>
+          <div class="learn-shortcut-arrow">›</div>
+        </div>
+
+        <div class="learn-shortcut-card" style="visibility:hidden;pointer-events:none"></div>
+      </div>
       <div style="height:24px"></div>
     </div>
   </div>`;
