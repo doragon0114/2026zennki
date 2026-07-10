@@ -271,6 +271,7 @@ function navigate(screen, params={}) {
     'profile-edit':   () => renderProfileEdit(),
     'battle-history': () => renderBattleHistory(),
     ranking:          () => renderRanking(),
+    'character-growth': () => renderCharacterGrowth(),
   };
   if (map[screen]) {
     screenEl.innerHTML = map[screen]();
