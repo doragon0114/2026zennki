@@ -103,24 +103,26 @@ async function getBattleHistoryByUserId(userId) {
   const [rows] = await db.query(
     `
     SELECT
-      battle_history_id AS id,
-      room_id AS roomId,
-      user_id AS userId,
-      player_name AS playerName,
-      opponent_user_id AS opponentUserId,
-      opponent_name AS opponent,
-      opponent_avatar AS avatar,
-      result,
-      my_score AS myScore,
-      opp_score AS oppScore,
-      pts,
-      subject,
-      age,
-      battle_date AS date,
-      created_at AS createdAt
-    FROM battle_history
-    WHERE user_id = ?
-    ORDER BY created_at DESC
+      bh.battle_history_id AS id,
+      bh.room_id AS roomId,
+      bh.user_id AS userId,
+      bh.player_name AS playerName,
+      bh.opponent_user_id AS opponentUserId,
+      bh.opponent_name AS opponent,
+      COALESCE(NULLIF(u.avater, ''), NULLIF(bh.opponent_avatar, ''), '🤖') AS avatar,
+      bh.result,
+      bh.my_score AS myScore,
+      bh.opp_score AS oppScore,
+      bh.pts,
+      bh.subject,
+      bh.age,
+      bh.battle_date AS date,
+      bh.created_at AS createdAt
+    FROM battle_history bh
+    LEFT JOIN users u
+      ON bh.opponent_user_id = u.user_id
+    WHERE bh.user_id = ?
+    ORDER BY bh.created_at DESC
     `,
     [userId]
   );

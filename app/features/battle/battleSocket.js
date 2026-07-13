@@ -16,12 +16,47 @@ const waitingPlayers = new Map();
 const playerRooms = new Map();
 const activeRooms = new Map();
 
-const BATTLE_POINT_WIN = 30;
-const BATTLE_POINT_DRAW = 10;
-const BATTLE_TIME_LIMIT = 15;
+const BATTLE_POINT_WIN = 150;
+const BATTLE_POINT_DRAW = 50;
+const BATTLE_TIME_LIMIT = 20;
 
 function createId(prefix) {
   return `${prefix}_${crypto.randomBytes(5).toString("hex")}`;
+}
+
+async function findBattleUserById(userId) {
+  const id = String(userId || "").trim();
+
+  if (!id) {
+    return null;
+  }
+
+  const [rows] = await db.query(
+    `
+    SELECT
+      user_id AS userId,
+      username,
+      COALESCE(NULLIF(avater, ''), '🐧') AS avatar
+    FROM users
+    WHERE user_id = ?
+    LIMIT 1
+    `,
+    [id]
+  );
+
+  return rows[0] || null;
+}
+
+function normalizeMatchMode(value) {
+  return value === "private" ? "private" : "public";
+}
+
+function normalizePasscode(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 20);
 }
 
 function send(ws, type, payload = {}) {
@@ -42,7 +77,11 @@ function broadcast(room, type, payload = {}) {
 }
 
 function getMatchKey(player) {
-  return `${player.subject}:${player.age}`;
+  if (player.matchMode === "private") {
+    return `private:${player.subject}:${player.passcode}`;
+  }
+
+  return `public:${player.subject}:${player.age}`;
 }
 
 function initBattleWebSocket(server) {
@@ -59,7 +98,9 @@ function initBattleWebSocket(server) {
       age: 15,
       subject: "math",
       avatar: "🐧",
-      userId: null
+      userId: null,
+      matchMode: "public",
+      passcode: ""
     };
 
     send(ws, "connected", {
@@ -114,11 +155,11 @@ async function handleMessage(player, data) {
 }
 
 async function handleJoin(player, data) {
-  player.name = String(data.name || "ゲスト").trim().slice(0, 20);
   player.age = Number(data.age || 15);
   player.subject = data.subject || "math";
-  player.avatar = data.avatar || "🐧";
   player.userId = String(data.userId || "").trim();
+  player.matchMode = normalizeMatchMode(data.matchMode);
+  player.passcode = normalizePasscode(data.passcode);
 
   if (!player.userId) {
     send(player.ws, "error", {
@@ -126,6 +167,21 @@ async function handleJoin(player, data) {
     });
     return;
   }
+
+  const dbUser = await findBattleUserById(player.userId);
+
+  if (!dbUser) {
+    send(player.ws, "error", {
+      message: "ユーザー情報が見つからないため、対戦できません。"
+    });
+    return;
+  }
+
+  player.name = String(dbUser.username || data.name || "ゲスト")
+    .trim()
+    .slice(0, 20);
+
+  player.avatar = dbUser.avatar || "🐧";
 
   if (!Number.isInteger(player.age) || player.age < 1 || player.age > 120) {
     send(player.ws, "error", {
@@ -139,6 +195,13 @@ async function handleJoin(player, data) {
   if (!subjectLabel) {
     send(player.ws, "error", {
       message: "教科が正しくありません。"
+    });
+    return;
+  }
+
+  if (player.matchMode === "private" && !player.passcode) {
+    send(player.ws, "error", {
+      message: "パスコード対戦ではパスコードが必要です。"
     });
     return;
   }
@@ -161,13 +224,20 @@ async function handleJoin(player, data) {
   send(player.ws, "joined", {
     playerId: player.id,
     name: player.name,
+    avatar: player.avatar,
     age: player.age,
     subject: player.subject,
     subjectLabel,
+    matchMode: player.matchMode,
+    passcode: player.matchMode === "private" ? player.passcode : "",
     ownQuestionCount: ownCheck.count
   });
 
-  if (waiting && waiting.ws.readyState === WebSocket.OPEN && waiting.id !== player.id) {
+  if (
+    waiting &&
+    waiting.ws.readyState === WebSocket.OPEN &&
+    waiting.id !== player.id
+  ) {
     waitingPlayers.delete(key);
     await createRoom(waiting, player);
     return;
@@ -176,7 +246,9 @@ async function handleJoin(player, data) {
   waitingPlayers.set(key, player);
 
   send(player.ws, "waiting", {
-    message: `${subjectLabel} / ${player.age}歳で相手を探しています。`
+    message: player.matchMode === "private"
+      ? `${subjectLabel} / パスコード「${player.passcode}」で相手を探しています。`
+      : `${subjectLabel} / ${player.age}歳で相手を探しています。`
   });
 }
 
@@ -219,6 +291,8 @@ async function createRoom(playerA, playerB) {
     id: roomId,
     subject: playerA.subject,
     age: playerA.age,
+    matchMode: playerA.matchMode,
+    passcode: playerA.matchMode === "private" ? playerA.passcode : "",
     players: [playerA, playerB],
     questions,
     current: -1,
@@ -241,6 +315,8 @@ async function createRoom(playerA, playerB) {
     subject: room.subject,
     subjectLabel: getSubjectLabel(room.subject),
     age: room.age,
+    matchMode: room.matchMode,
+    passcode: room.matchMode === "private" ? room.passcode : "",
     players: room.players.map(player => ({
       id: player.id,
       name: player.name,

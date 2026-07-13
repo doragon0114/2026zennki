@@ -117,14 +117,16 @@ router.put("/profile", async (req, res) => {
       username,
       profile,
       userTags,
-      email
+      email,
+      avatar
     } = req.body;
 
     const user = await authService.updateUserProfile(req.session.userId, {
       username,
       profile,
       userTags,
-      email
+      email,
+      avatar
     });
 
     res.json({
