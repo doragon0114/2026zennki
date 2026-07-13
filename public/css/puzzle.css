@@ -1,0 +1,265 @@
+/* ============================================================
+   css/puzzle.css — パズルルーム画面（js/puzzle.js 担当）
+============================================================ */
+
+/* ====== ピースカラーパレット ======
+   盤面ごとに色を割り当てる（既存の色分けクラスと対応する配色） */
+.puzzle-color-0 { --pz-c: var(--green);  --pz-bg: var(--green-bg); }
+.puzzle-color-1 { --pz-c: var(--primary);--pz-bg: var(--primary-soft); }
+.puzzle-color-2 { --pz-c: var(--gold);   --pz-bg: var(--gold-bg); }
+.puzzle-color-3 { --pz-c: var(--purple); --pz-bg: var(--purple-bg); }
+.puzzle-color-4 { --pz-c: var(--red);    --pz-bg: var(--red-bg); }
+.puzzle-color-5 { --pz-c: var(--teal);   --pz-bg: var(--teal-bg); }
+
+/* ====== パズルルーム：ヒーローエリア ======
+   紫系グラデーションで対戦画面（赤系）と差別化する */
+.puzzle-hero {
+  background:
+    radial-gradient(500px 320px at 85% -10%, rgba(196, 181, 253, 0.45), transparent 60%),
+    radial-gradient(420px 320px at 5% 110%, rgba(147, 197, 253, 0.35), transparent 60%),
+    linear-gradient(150deg, #7C3AED 0%, #8B5CF6 50%, #6D28D9 100%);
+  padding: 20px 22px 26px;
+  text-align: center;
+  color: white;
+  border-radius: 0 0 28px 28px;
+  position: relative;
+  overflow: hidden;
+}
+.puzzle-hero::before,
+.puzzle-hero::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.09);
+  pointer-events: none;
+}
+.puzzle-hero::before { width: 220px; height: 220px; top: -90px; right: -60px; }
+.puzzle-hero::after  { width: 160px; height: 160px; bottom: -60px; left: -50px; }
+
+.puzzle-hero-back {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+  z-index: 2;
+}
+
+.puzzle-hero-icon {
+  display: flex;
+  justify-content: center;
+  margin: 30px 0 8px;
+  position: relative;
+  z-index: 1;
+  animation: float 4s ease-in-out infinite;
+}
+.puzzle-hero-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  position: relative;
+  z-index: 1;
+}
+.puzzle-hero-sub {
+  font-size: 12.5px;
+  opacity: 0.92;
+  margin-top: 4px;
+  font-weight: 500;
+  position: relative;
+  z-index: 1;
+}
+
+.puzzle-hero-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 22px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--r-lg);
+  padding: 14px 8px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 1;
+}
+.puzzle-hero-stat { flex: 1; }
+.puzzle-hero-stat-num {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.puzzle-hero-stat-num span { font-size: 12px; font-weight: 700; opacity: 0.75; }
+.puzzle-hero-stat-lbl { font-size: 10.5px; opacity: 0.88; font-weight: 600; margin-top: 5px; }
+.puzzle-hero-stat-sep { width: 1px; height: 30px; background: rgba(255, 255, 255, 0.24); flex-shrink: 0; }
+
+/* ====== 盤面一覧カード ====== */
+.puzzle-board-list { display: flex; flex-direction: column; gap: 12px; }
+
+.puzzle-board-card {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: 14px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.puzzle-board-card:active { transform: scale(0.99); }
+.puzzle-board-card:hover { box-shadow: var(--shadow-md); }
+
+/* ミニプレビュー：獲得済みピースのみ色が付く小さなグリッド */
+.puzzle-mini-grid {
+  display: grid;
+  gap: 2px;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--border-soft);
+  padding: 3px;
+}
+.puzzle-mini-cell {
+  background: var(--surface-alt);
+  border-radius: 3px;
+}
+.puzzle-mini-cell.filled { background: var(--pz-c); }
+
+.puzzle-board-info { flex: 1; min-width: 0; }
+.puzzle-board-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+  letter-spacing: -0.2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.puzzle-complete-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #B45309;
+  background: var(--gold-bg);
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  flex-shrink: 0;
+}
+.puzzle-board-progress-bar-bg {
+  height: 5px;
+  background: var(--border-soft);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.puzzle-board-progress-bar-fill {
+  height: 100%;
+  background: var(--pz-c);
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+.puzzle-board-meta { font-size: 11.5px; color: var(--text-3); font-weight: 600; }
+
+.puzzle-board-arrow { color: var(--text-muted); font-size: 18px; flex-shrink: 0; }
+
+/* ====== 盤面詳細：ピースグリッド ====== */
+.puzzle-grid-wrap {
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-soft);
+  margin-bottom: 16px;
+}
+.puzzle-grid {
+  display: grid;
+  gap: 6px;
+}
+.puzzle-piece {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.puzzle-piece.acquired {
+  background: var(--pz-c);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  animation: bounceIn 0.4s ease-out;
+}
+.puzzle-piece-num {
+  color: white;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  opacity: 0.92;
+}
+.puzzle-piece.locked {
+  background: var(--pz-bg);
+}
+.puzzle-piece-blur {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  background: rgba(255, 255, 255, 0.38);
+}
+.puzzle-piece-lock {
+  position: relative;
+  z-index: 1;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
+/* ====== 盤面詳細：統計行 ====== */
+.puzzle-stats-row { display: flex; gap: 10px; margin-bottom: 16px; }
+.puzzle-stat {
+  flex: 1;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: 14px 8px;
+  text-align: center;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-soft);
+}
+.puzzle-stat-num {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.puzzle-stat-lbl { font-size: 11px; color: var(--text-3); margin-top: 6px; font-weight: 600; }
+
+/* ====== コンプリートバナー ====== */
+.puzzle-complete-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+  border: 1px solid #FCD34D;
+  border-radius: var(--r-lg);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  color: #92400E;
+}
+.puzzle-complete-banner svg { flex-shrink: 0; animation: bounceIn 0.5s ease-out; }
+.puzzle-complete-banner-title { font-size: 15px; font-weight: 800; letter-spacing: -0.2px; }
+.puzzle-complete-banner-sub { font-size: 12px; margin-top: 2px; font-weight: 600; opacity: 0.85; }
