@@ -85,13 +85,13 @@ body {
   background-attachment: fixed;
   display: flex;
   justify-content: center;
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 #app {
   width: 100%;
   max-width: 480px;
-  min-height: 100vh;
+  min-height: 100dvh;
   background: linear-gradient(180deg, #F2F6FF 0%, #F8FBFF 50%, #FFFFFF 100%);
   position: relative;
   display: flex;
@@ -104,7 +104,7 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-bottom: 108px;
+  padding-bottom: 90px;
   scrollbar-width: none;
 }
 #screen::-webkit-scrollbar { display: none; }
@@ -553,4 +553,10 @@ body {
   margin-right: 4px;
   opacity: 0.7;
   flex-shrink: 0;
+}
+
+
+
+#screen.no-bottom-nav {
+  padding-bottom: 0;
 }

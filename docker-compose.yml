@@ -1,10 +1,6 @@
-version: '3.8'
-
 services:
   app:
     build: ./app
-    env_file:
-      - .env
     ports:
       - "3000:3000"
     volumes:
@@ -18,6 +14,8 @@ services:
       - DB_NAME=${MYSQL_DATABASE}
       - OLLAMA_URL=http://ollama:11434
       - GOOGLE_VISION_API_KEY=${GOOGLE_VISION_API_KEY}
+    env_file:          # ← これを追加
+      - .env           # ← これを追加
     depends_on:
       mysql:
         condition: service_healthy
@@ -29,10 +27,12 @@ services:
     ports:
       - "3307:3306"
     environment:
+      - DB_PORT=3306  
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_USER=${MYSQL_USER}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
