@@ -271,6 +271,9 @@ function navigate(screen, params={}) {
     'profile-edit':   () => renderProfileEdit(),
     'battle-history': () => renderBattleHistory(),
     ranking:          () => renderRanking(),
+    
+    'puzzle-room':  () => renderPuzzleRoom(),
+    'puzzle-board': () => renderPuzzleBoard(params),
   };
   if (map[screen]) {
     screenEl.innerHTML = map[screen]();
