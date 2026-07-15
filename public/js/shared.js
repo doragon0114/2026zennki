@@ -249,6 +249,7 @@ function navigate(screen, params={}) {
     navEl.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.screen===screen));
   } else {
     navEl.classList.add('hidden');
+     screenEl.classList.add('no-bottom-nav');
   }
 
   const map = {
@@ -338,4 +339,13 @@ function afterRender(screen, params) {
 /* ============================================================
    アプリ初期化
 ============================================================ */
-window.addEventListener('load', () => { navigate('splash'); });
+// window.addEventListener('load', () => { navigate('splash'); });
+window.addEventListener('load', () => {
+  navigate('splash');
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('SW ok:', reg.scope))
+      .catch(err => console.warn('SW failed:', err));
+  }
+});
