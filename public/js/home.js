@@ -459,13 +459,33 @@ function renderHome() {
         </div>
       </div>
       <div class="learn-shortcut-row">
-        <div class="learn-shortcut-card" onclick="navigate('undefined')">
+        <div
+          class="learn-shortcut-card"
+          onclick="openRpgMode()"
+        >
           <div class="learn-shortcut-icon red">
-            <!-- SVG icon for Magic wand -->
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" y1="19" x2="19" y2="13"/><line x1="16" y1="16" x2="20" y2="20"/><line x1="19" y1="21" x2="21" y2="19"/></svg>
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#DC2626"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 3 4 7v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V7l-8-4z"/>
+              <path d="m9 12 2 2 4-4"/>
+            </svg>
           </div>
-          <div class="learn-shortcut-label">RPGモード</div>
-          <div class="learn-shortcut-arrow">›</div>
+
+          <div class="learn-shortcut-label">
+            RPGモード
+          </div>
+
+          <div class="learn-shortcut-arrow">
+            ›
+          </div>
         </div>
         <div class="learn-shortcut-card" onclick="navigate('undefined')">
           <div class="learn-shortcut-icon red">
@@ -499,4 +519,11 @@ function renderHome() {
 /* お知らせポップアップ（プロトタイプ用） */
 function showNotif() {
   alert('お知らせ\n\n① 田中 太郎さんが対戦を申請しました\n② 新しい問題セットが公開されました\n\n※ プロトタイプのため詳細画面は省略しています');
+}
+/* ============================================================
+   RPGモードへの移動
+============================================================ */
+
+function openRpgMode() {
+  window.location.href = "/rpg/index.html";
 }

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>まおうをたおせ！ 勇者の学習クエスト</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<!-- ?v= はブラウザが古いキャッシュを使わないようにするためのバージョン番号（ファイル更新時に上げる） -->
+<link rel="stylesheet" href="css/style.css?v=3">
+</head>
+<body>
+<div id="game">
+
+  <!-- ===== 上部シーン ===== -->
+  <div id="scene">
+    <!-- 戦闘ビュー -->
+    <div id="battleView" class="view">
+      <canvas id="battleBg" width="480" height="300"></canvas>
+      <div id="hitFlash"></div>
+      <div id="enemyWrap">
+        <canvas id="enemyCanvas" width="240" height="240"></canvas>
+        <div id="enemyName">スライム</div>
+        <div id="enemyHpWrap"><div id="enemyHpFill" style="width:100%"></div></div>
+      </div>
+      <div id="heroWrap">
+        <canvas id="heroCanvas" width="120" height="150"></canvas>
+      </div>
+      <div class="ground"></div>
+    </div>
+    <!-- マップビュー -->
+    <div id="mapView" class="view">
+      <canvas id="mapCanvas" width="360" height="230"></canvas>
+      <div id="hotspotLayer"></div>
+      <canvas id="mapHero" width="30" height="38"></canvas>
+      <div id="areaLabel" class="win" style="padding:6px 14px;font-size:15px;letter-spacing:2px;">ガイアの大陸</div>
+      <div id="goldLabel" class="win" style="padding:6px 16px;font-size:15px;color:#ffe14d;letter-spacing:1px;">G <span id="goldMap">0</span></div>
+    </div>
+  </div>
+
+  <!-- ===== 下部UI ===== -->
+  <div id="ui">
+    <div id="msgWin" class="win">
+      <canvas id="portraitBox" width="64" height="64"></canvas>
+      <div id="msgText">ようこそ、勇者よ。</div>
+      <div id="advance">▼</div>
+    </div>
+    <div id="actionRow">
+      <div id="cmdWin" class="win">
+        <div id="cmdList" class="menu-list"></div>
+      </div>
+      <div id="statusWin" class="win">
+        <div class="st-name">勇者アレン</div>
+        <div class="st-row">
+          <span class="lab">HP</span>
+          <div class="bar"><i id="hpFill" class="hpfill" style="width:100%"></i></div>
+          <span class="st-num" id="hpText">15/15</span>
+        </div>
+        <div class="st-row">
+          <span class="lab">MP</span>
+          <div class="bar"><i id="mpFill" class="mpfill" style="width:100%"></i></div>
+          <span class="st-num" id="mpText">6/6</span>
+        </div>
+        <div class="st-foot">
+          <span id="lvText">Lv 1</span>
+          <span>SC <span id="scText">0</span></span>
+          <span>G <span id="goldText">0</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== タイトル ===== -->
+  <div id="titleScreen" class="overlay">
+    <canvas id="titleCanvas" class="title-emblem" width="120" height="120"></canvas>
+    <h1>まおうをたおせ！<br><small>勇者の学習クエスト</small></h1>
+    <p>魔王が世界を闇に染めた。<br>勇者よ、学びの力で魔王を打ち倒せ！<br>
+    <span class="sub">「たたかう」では中学校の学習問題が出題される。<br>正解すれば会心の一撃、まちがえると反撃をうける。</span></p>
+    <button class="btn" id="startBtn">▶ ぼうけんを はじめる</button>
+  </div>
+
+  <!-- ===== ゲームオーバー ===== -->
+  <div id="gameOverScreen" class="overlay hidden">
+    <h1 class="go">ゆうしゃは<br>たおれた…</h1>
+    <p id="goStats" class="sub"></p>
+    <button class="btn" id="retryBtn">▶ もういちど ちょうせん</button>
+  </div>
+
+  <!-- ===== クリア ===== -->
+  <div id="clearScreen" class="overlay hidden">
+    <h1 class="win">まおうを<br>たおした！</h1>
+    <p>世界に ふたたび 光が もどった。<br>勇者の 学びの旅は、ここに 完結する。<br>
+    <span id="clearStats" class="sub"></span></p>
+    <button class="btn" id="clearRetryBtn">▶ はじめから あそぶ</button>
+  </div>
+
+  <!-- ===== せんとうけっか（リザルト） ===== -->
+  <div id="resultScreen" class="overlay hidden">
+    <div class="panel-win win">
+      <h2>せんとうけっか</h2>
+      <div id="resultRank" class="rank-letter rank-S">S</div>
+      <div id="resultBody"></div>
+      <button class="btn" id="resultBtn">▶ つづける</button>
+    </div>
+  </div>
+
+  <!-- ===== 王国ランキング ===== -->
+  <div id="rankScreen" class="overlay hidden">
+    <div class="panel-win win">
+      <h2>👑 王国ランキング</h2>
+      <ol id="rankList"></ol>
+      <button class="btn" id="rankCloseBtn">▶ とじる</button>
+    </div>
+  </div>
+
+</div>
+
+<!--
+  スクリプトは依存関係の順に読み込む（後のファイルが前のファイルの関数・変数を使う）:
+  sprites → data → state → ui → skills → score → map → battle → game
+-->
+<script src="js/sprites.js?v=3"></script>
+<script src="js/data.js?v=3"></script>
+<script src="js/state.js?v=3"></script>
+<script src="js/ui.js?v=3"></script>
+<script src="js/skills.js?v=3"></script>
+<script src="js/score.js?v=3"></script>
+<script src="js/map.js?v=3"></script>
+<script src="js/battle.js?v=3"></script>
+<script src="js/game.js?v=3"></script>
+</body>
+</html>

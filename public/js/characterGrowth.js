@@ -121,6 +121,73 @@ function getRandomDragonExpression() {
   return expressions[Math.floor(Math.random() * expressions.length)];
 }
 
+function getRandomDragonExpressionExcept(currentExpressionKey = "") {
+  const expressions = getDragonExpressions();
+
+  const candidates = expressions.filter(expression => {
+    return expression.key !== currentExpressionKey;
+  });
+
+  const targetExpressions =
+    candidates.length > 0
+      ? candidates
+      : expressions;
+
+  return targetExpressions[
+    Math.floor(Math.random() * targetExpressions.length)
+  ];
+}
+
+function getDragonInteractionMessage(character, stage, expression) {
+  const characterMessages = {
+    study: {
+      normal: "静かにこちらを見ています。",
+      happy: "なでられて、とてもうれしそうです。",
+      focus: "気持ちが引き締まり、学習への集中力が高まっています。",
+      sleepy: "安心したのか、少し眠そうにしています。",
+      serious: "次の学習に向けて、本気の顔になりました。",
+      proud: "今までの学習成果を誇らしげに見せています。"
+    },
+
+    battle: {
+      normal: "落ち着いて次の勝負を待っています。",
+      happy: "なでられて、勝負前とは思えないほどご機嫌です。",
+      focus: "次の対戦相手を見据えて集中しています。",
+      sleepy: "戦いの合間に少し休憩したいようです。",
+      serious: "勝利を目指して闘志を燃やしています。",
+      proud: "これまでの勝利を自慢したそうにしています。"
+    },
+
+    question: {
+      normal: "次に作る問題を静かに考えています。",
+      happy: "新しい問題のアイデアを思いついたようです。",
+      focus: "問題の構成を真剣に考えています。",
+      sleepy: "アイデアを考えすぎて、少し眠そうです。",
+      serious: "良い問題を作るために、本気になっています。",
+      proud: "これまで作った問題を誇らしげに眺めています。"
+    }
+  };
+
+  const stageMessages = {
+    egg: "卵の中から、小さく反応する音が聞こえました。",
+    hatch: "小さな体を近づけて、もっと触ってほしそうです。",
+    child: "元気よく動き回り、こちらを見上げています。",
+    adult: "堂々とした姿ですが、なでられるのは好きなようです。",
+    evolved: "体からあふれる力が、少しだけ強くなりました。",
+    complete: "完全体になっても、触れ合えることがうれしいようです。"
+  };
+
+  const characterMessage =
+    characterMessages[character.key]?.[expression.key] ??
+    "こちらを見つめています。";
+
+  const stageMessage =
+    stageMessages[stage.key] ??
+    "";
+
+  return `${characterMessage} ${stageMessage}`;
+}
+
 function getDragonExpressionMessage(character, stage, expression) {
   const stageMessages = {
     egg: `${character.label}はまだ卵の中。小さな力をためています。`,
@@ -188,6 +255,125 @@ function getDragonGrowthInfo(character, count) {
   };
 }
 
+function interactWithDragon(characterKey) {
+  const character = getGrowthCharacters().find(item => {
+    return item.key === characterKey;
+  });
+
+  if (!character) {
+    return;
+  }
+
+  const counts = getUserGrowthCounts();
+  const count = counts[characterKey] || 0;
+  const info = getDragonGrowthInfo(character, count);
+
+  const card = document.querySelector(
+    `[data-growth-card="${characterKey}"]`
+  );
+
+  if (!card) {
+    return;
+  }
+
+  const avatar = card.querySelector(
+    ".growth-current-avatar .dragon-avatar"
+  );
+
+  const message = card.querySelector(
+    ".dragon-message"
+  );
+
+  const effect = card.querySelector(
+    ".growth-touch-effect"
+  );
+
+  const button = card.querySelector(
+    ".growth-touch-button"
+  );
+
+  if (!avatar || !message) {
+    return;
+  }
+
+  const expressions = getDragonExpressions();
+
+  const currentExpression = expressions.find(expression => {
+    return avatar.classList.contains(
+      `face-${expression.key}`
+    );
+  });
+
+  const nextExpression = getRandomDragonExpressionExcept(
+    currentExpression?.key || ""
+  );
+
+  expressions.forEach(expression => {
+    avatar.classList.remove(
+      `face-${expression.key}`
+    );
+  });
+
+  avatar.classList.add(
+    `face-${nextExpression.key}`
+  );
+
+  message.textContent = getDragonInteractionMessage(
+    character,
+    info.current,
+    nextExpression
+  );
+
+  /*
+   * キャラクターのリアクションを再生
+   */
+  avatar.classList.remove(
+    "dragon-touch-reaction"
+  );
+
+  void avatar.offsetWidth;
+
+  avatar.classList.add(
+    "dragon-touch-reaction"
+  );
+
+  /*
+   * ハート演出
+   */
+  if (effect) {
+    effect.classList.remove("show");
+    effect.innerHTML = `
+      <span>♥</span>
+      <span>♥</span>
+      <span>♥</span>
+      <span>♥</span>
+      <span>♥</span>
+    `;
+
+    void effect.offsetWidth;
+
+    effect.classList.add("show");
+
+    window.setTimeout(() => {
+      effect.classList.remove("show");
+      effect.innerHTML = "";
+    }, 900);
+  }
+
+  /*
+   * 連打防止
+   */
+  if (button) {
+    button.disabled = true;
+    button.textContent = "よろこんでいる！";
+
+    window.setTimeout(() => {
+      button.disabled = false;
+      button.textContent = "♡ なでる";
+    }, 700);
+  }
+}
+
 function renderDragonAvatar(stage, expression, extraClass = "", characterKey = "study") {
   return `
     <div class="dragon-avatar dragon-${stage.key} face-${expression} kind-${characterKey} ${extraClass}">
@@ -235,48 +421,111 @@ function renderGrowthCard(info) {
     : "すべての変化を記録済み";
 
   return `
-    <div class="hero ${info.character.colorClass}">
+    <div
+      class="hero ${info.character.colorClass}"
+      data-growth-card="${esc(info.character.key)}"
+    >
       <div class="current">
-        ${renderDragonAvatar(info.current, info.expression.key, "", info.character.key)}
-        <div>
-          <div class="kicker">${esc(info.character.label)}</div>
-          <div class="name">${esc(info.current.name)}</div>
+        <div class="growth-current-avatar">
+          ${renderDragonAvatar(
+            info.current,
+            info.expression.key,
+            "",
+            info.character.key
+          )}
+
+          <div
+            class="growth-touch-effect"
+            aria-hidden="true"
+          ></div>
+        </div>
+
+        <div class="growth-current-info">
+          <div class="kicker">
+            ${esc(info.character.label)}
+          </div>
+
+          <div class="name">
+            ${esc(info.current.name)}
+          </div>
+
           <div class="sub">
             ${esc(info.current.title)}<br>
             ${esc(info.current.text)}
           </div>
-          <div class="dragon-message">
+
+          <div
+            class="dragon-message"
+            aria-live="polite"
+          >
             ${esc(info.expressionMessage)}
           </div>
         </div>
       </div>
 
       <div class="bar">
-        <div class="bar-fill" style="width:${info.progress}%"></div>
+        <div
+          class="bar-fill"
+          style="width:${info.progress}%"
+        ></div>
       </div>
-      <div class="sub" style="margin-top:8px">${esc(progressText)}</div>
+
+      <div
+        class="sub"
+        style="margin-top:8px"
+      >
+        ${esc(progressText)}
+      </div>
 
       <div class="stats hero-stats">
         <div class="stat dark">
-          <div class="stat-label">${esc(info.character.countLabel)}</div>
-          <div class="stat-value">${info.count}${esc(info.character.unit)}</div>
+          <div class="stat-label">
+            ${esc(info.character.countLabel)}
+          </div>
+
+          <div class="stat-value">
+            ${info.count}${esc(info.character.unit)}
+          </div>
         </div>
+
         <div class="stat dark">
-          <div class="stat-label">現在の力</div>
-          <div class="stat-value">${esc(info.current.trait)}</div>
+          <div class="stat-label">
+            現在の力
+          </div>
+
+          <div class="stat-value">
+            ${esc(info.current.trait)}
+          </div>
         </div>
       </div>
 
       <div class="history-box">
-        <div class="panel-title light">これまでの姿</div>
+        <div class="panel-title light">
+          これまでの姿
+        </div>
+
         <div class="history-list">
           ${renderPreviousForms(info)}
         </div>
       </div>
 
-      <button class="btn btn-primary growth-action" onclick="navigate('${info.character.actionScreen}')">
-        ${esc(info.character.actionLabel)}
-      </button>
+      <div class="growth-card-actions">
+        <button
+          class="growth-touch-button"
+          type="button"
+          onclick="interactWithDragon('${info.character.key}')"
+        >
+          ♡ なでる
+        </button>
+
+        <button
+          class="btn btn-primary growth-action"
+          type="button"
+          onclick="navigate('${info.character.actionScreen}')"
+        >
+          ${esc(info.character.actionLabel)}
+        </button>
+      </div>
     </div>
   `;
 }
