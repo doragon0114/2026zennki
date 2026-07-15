@@ -1,0 +1,315 @@
+/* ============================================================
+   まおうをたおせ！ 勇者の学習クエスト  スタイルシート
+   （画面レイアウト・ウィンドウ・アニメーション定義）
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  height: 100%;
+  background: #000;
+  font-family: "DotGothic16", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", "MS PGothic", sans-serif;
+  color: #fff;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#game {
+  width: 100%;
+  max-width: 720px;
+  height: 100vh;
+  max-height: 810px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  position: relative;
+}
+canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+/* ===== シーン（上：戦闘フィールド or マップ） ===== */
+#scene {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 200px;
+}
+.view { position: absolute; inset: 0; display: none; }
+.view.active { display: block; }
+
+/* 戦闘ビュー */
+#battleView {
+  background: #030812;
+}
+/* 洞窟などの戦闘背景を描くキャンバス（岩壁・鍾乳石・床・光条をここに描画）。最背面に敷く */
+#battleBg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  z-index: 0;
+  pointer-events: none;
+}
+/* 天井から落ちる水滴のきらめき（鉱石の粒）。背景キャンバスの上に重ねる演出レイヤー */
+#battleView::before {
+  content: "";
+  position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background-image:
+    radial-gradient(2px 2px at 12% 18%, rgba(255,255,255,.8), transparent 60%),
+    radial-gradient(1.5px 1.5px at 28% 10%, rgba(255,255,255,.6), transparent 60%),
+    radial-gradient(2px 2px at 46% 22%, rgba(255,255,255,.5), transparent 60%),
+    radial-gradient(1.5px 1.5px at 64% 8%, rgba(255,255,255,.7), transparent 60%),
+    radial-gradient(2px 2px at 80% 16%, rgba(255,255,255,.5), transparent 60%),
+    radial-gradient(1.5px 1.5px at 92% 24%, rgba(255,255,255,.6), transparent 60%),
+    radial-gradient(1.5px 1.5px at 8% 32%, rgba(200,220,255,.4), transparent 60%),
+    radial-gradient(1.5px 1.5px at 55% 34%, rgba(200,220,255,.35), transparent 60%);
+  opacity: .8;
+  animation: twinkle 2.6s ease-in-out infinite;
+}
+@keyframes twinkle { 0%,100%{opacity:.5;} 50%{opacity:1;} }
+/* 画面のふちを少し暗くして中央の被写体を目立たせるビネット */
+#battleView::after {
+  content: "";
+  position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  box-shadow: inset 0 0 70px 10px rgba(0,0,0,.55);
+}
+#enemyWrap {
+  position: absolute;
+  left: 4%;
+  top: 50%;
+  transform: translateY(-55%);
+  text-align: center;
+  z-index: 3;
+}
+#enemyCanvas {
+  filter: drop-shadow(5px 8px 0 rgba(0,0,0,0.55));
+  /* 大きい表示枠（魔王など）でも狭い画面からはみ出さないように制限する。
+     height:auto で縦横比は保たれる */
+  max-width: 56vw;
+  height: auto;
+}
+#enemyName {
+  margin-top: 4px; font-size: 14px; letter-spacing: 1px;
+  text-shadow: 2px 2px 0 #000; color:#eaf2ff;
+}
+#enemyHpWrap {
+  width: 150px; height: 9px; margin: 5px auto 0;
+  background:#101820; border:2px solid #cfe0ff;
+  box-shadow: 0 0 0 2px #000;
+}
+#enemyHpFill { height:100%; background: linear-gradient(#ff6b5e,#e03020); transition: width .3s; }
+
+#heroWrap {
+  position: absolute;
+  right: 6%;
+  top: 52%;
+  transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  z-index: 3;
+}
+#heroCanvas { filter: drop-shadow(4px 6px 0 rgba(0,0,0,0.5)); }
+
+.ground {
+  position:absolute; left:0; right:0; bottom:0; height:26%;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 100%);
+  pointer-events:none; z-index: 2;
+}
+
+/* マップビュー */
+#mapView { background:#000; cursor:pointer; }
+#mapCanvas { width:100%; height:100%; display:block; }
+#areaLabel {
+  position:absolute; left:14px; top:14px;
+}
+#goldLabel {
+  position:absolute; right:14px; bottom:14px;
+}
+#hotspotLayer { position:absolute; inset:0; pointer-events:none; }
+.hotspot {
+  position:absolute; pointer-events:auto; cursor:pointer;
+  transform: translate(-50%,-100%);
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  animation: hsBounce 1.4s ease-in-out infinite;
+}
+.hotspot .icon { font-size:22px; filter: drop-shadow(2px 3px 0 rgba(0,0,0,.6)); line-height:1; }
+.hotspot .label {
+  font-size:11px; white-space:nowrap; padding:1px 7px; border-radius:4px;
+  background: rgba(8,16,60,.85); border:1px solid #cfe0ff; color:#eaf2ff;
+}
+@keyframes hsBounce {
+  0%,100% { transform:translate(-50%,-100%); }
+  50% { transform:translate(-50%,-112%); }
+}
+#mapHero {
+  position:absolute; pointer-events:none; width:30px; height:38px;
+  filter: drop-shadow(3px 4px 0 rgba(0,0,0,.5));
+}
+
+/* アニメ */
+.shake { animation: shake .3s; }
+@keyframes shake {
+  0%,100%{transform:translateY(-55%) translateX(0);}
+  25%{transform:translateY(-55%) translateX(-7px);}
+  50%{transform:translateY(-55%) translateX(7px);}
+  75%{transform:translateY(-55%) translateX(-5px);}
+}
+.heroshake { animation: heroshake .3s; }
+@keyframes heroshake {
+  0%,100%{transform:translateY(-50%) translateX(0);}
+  25%{transform:translateY(-50%) translateX(7px);}
+  50%{transform:translateY(-50%) translateX(-7px);}
+  75%{transform:translateY(-50%) translateX(5px);}
+}
+.flash { animation: flashA .18s 2; }
+@keyframes flashA { 50%{opacity:.25;} }
+#hitFlash {
+  position:absolute; inset:0; background:#ff2020; opacity:0;
+  pointer-events:none; mix-blend-mode:screen; z-index:5;
+}
+#hitFlash.on { animation: hf .35s; }
+@keyframes hf { 0%{opacity:0;} 30%{opacity:.5;} 100%{opacity:0;} }
+
+.damage-pop {
+  position:absolute; font-size:24px; font-weight:bold;
+  color:#ffe14d; text-shadow:2px 2px 0 #000, -1px -1px 0 #000;
+  pointer-events:none; animation: popUp 1s ease-out forwards; z-index:5;
+}
+.damage-pop.heal { color:#7dff9a; }
+@keyframes popUp {
+  0%{transform:translateY(6px) scale(.6);opacity:0;}
+  20%{transform:translateY(0) scale(1.1);opacity:1;}
+  100%{transform:translateY(-46px) scale(1);opacity:0;}
+}
+
+/* ===== 下部UI：クラシック青ウィンドウ ===== */
+#ui { padding: 8px; display:flex; flex-direction:column; gap:8px; background:#000; }
+.win {
+  /* 左上がやや明るく、右下にいくほど暗くなる対角グラデーションで往年のRPGウィンドウ感を再現 */
+  background: radial-gradient(130% 150% at 12% 8%, #4462d0 0%, #23409c 38%, #14276e 68%, #0a1440 100%);
+  border: 2px solid #f2f6ff;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px #060b2a, inset 0 0 0 1px #7f9bec, inset 0 2px 6px rgba(255,255,255,.16), 3px 3px 0 rgba(0,0,0,.45);
+  color:#fff; text-shadow: 1px 1px 0 #041;
+}
+#msgWin {
+  min-height: 82px;
+  padding: 10px 14px 10px 12px;
+  font-size: 16px; line-height: 1.65; letter-spacing:.5px;
+  display:flex; gap:10px; align-items:flex-start;
+  position: relative;
+  text-shadow: 1px 1px 0 #0a1a5a;
+}
+#portraitBox {
+  flex:0 0 auto; width:64px; height:64px; display:none;
+  border:2px solid #eaf0ff; border-radius:5px; background:#0a1650;
+  box-shadow: inset 0 0 0 1px #4a67d8;
+}
+#portraitBox.show { display:block; }
+#msgText .q { color:#ffe14d; }
+#msgText b.blue { color:#8fd0ff; }
+#msgText b.gold { color:#ffe14d; }
+#msgText b.red  { color:#ff8a7a; }
+#msgText .cat { color:#9fe0ff; font-size:13px; }
+#advance {
+  position:absolute; right:12px; bottom:8px; color:#ffe14d;
+  font-size:14px; display:none;
+}
+#advance.show { display:block; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50%{opacity:0;} }
+
+#actionRow { display:flex; gap:8px; align-items:stretch; }
+#cmdWin { flex: 1 1 58%; padding: 8px 10px; }
+#statusWin { flex: 1 1 42%; padding: 8px 10px; }
+
+.menu-list { display:flex; flex-direction:column; gap:2px; }
+.item {
+  cursor:pointer; position:relative; padding:4px 6px 4px 24px;
+  font-size:16px; letter-spacing:1px; border-radius:4px;
+  transition: color .08s, background .08s;
+}
+.item::before {
+  content:"▶"; position:absolute; left:6px; top:4px; color:#ffe14d; opacity:0;
+  transition:opacity .08s;
+}
+.item:hover { color:#ffe14d; background: rgba(255,255,255,.08); }
+.item:hover::before { opacity:1; }
+.item.disabled { color:#8a9ad0; cursor:default; }
+.item.disabled:hover { color:#8a9ad0; background:none; }
+.item.disabled:hover::before { opacity:0; }
+.item .sub { color:#bcd0ff; font-size:12px; }
+
+/* ステータスウィンドウ内容 */
+.st-name { font-size:15px; letter-spacing:1px; margin-bottom:4px; color:#eaf2ff; }
+.st-row { display:flex; align-items:center; gap:6px; font-size:13px; margin:3px 0; }
+.st-row .lab { width:26px; color:#bcd0ff; }
+.bar { flex:1; height:11px; background:#0a1240; border:2px solid #cfe0ff; box-shadow:inset 0 0 0 1px #000; position:relative; }
+.bar > i { display:block; height:100%; transition: width .3s, background .3s; }
+.hpfill { background: linear-gradient(#7dff8f,#22aa3a); }
+.mpfill { background: linear-gradient(#7fd0ff,#1670d0); }
+.st-num { width:52px; text-align:right; font-size:13px; letter-spacing:.5px; }
+.st-foot { display:flex; justify-content:space-between; font-size:13px; margin-top:5px; color:#ffe14d; }
+
+/* ===== オーバーレイ ===== */
+.overlay {
+  position:absolute; inset:0; z-index:30;
+  background: rgba(2,4,16,.96);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; gap:20px; padding:24px;
+}
+.overlay h1 { font-size:30px; letter-spacing:3px; line-height:1.45; text-shadow:3px 3px 0 #0a1a6a; }
+.overlay h1 small { font-size:18px; color:#8fd0ff; }
+.overlay h1.go { color:#ff5a4a; text-shadow:3px 3px 0 #400; }
+.overlay h1.win { color:#ffe14d; text-shadow:3px 3px 0 #553; }
+.overlay p { font-size:14px; line-height:1.9; color:#cdd8f5; }
+.overlay .sub { color:#8fa0d0; font-size:13px; }
+.btn {
+  cursor:pointer; font-family:inherit; font-size:18px; letter-spacing:2px;
+  color:#fff; padding:12px 30px; border-radius:8px;
+  background: linear-gradient(180deg,#2947b8,#0a1a6a);
+  border:3px solid #eaf0ff; box-shadow:0 0 0 3px #000;
+  transition: filter .1s, transform .05s;
+}
+.btn:hover { filter:brightness(1.25); }
+.btn:active { transform: translateY(2px); }
+.hidden { display:none !important; }
+.title-emblem { margin-bottom:6px; }
+
+/* ===== リザルト・ランキング共通のパネル ===== */
+.panel-win {
+  max-width: 360px; width: 92%;
+  padding: 18px 20px 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.panel-win h2 {
+  font-size: 20px; letter-spacing: 2px;
+  color: #ffe14d; text-shadow: 2px 2px 0 #000;
+}
+#resultBody { font-size: 15px; line-height: 2; text-align: center; }
+
+/* ランク文字（S/A/B/C）: ランクごとに色を変える */
+.rank-letter {
+  font-size: 56px; font-weight: bold; line-height: 1;
+  text-shadow: 3px 3px 0 #000;
+}
+.rank-S { color: #ffd730; }
+.rank-A { color: #7fd0ff; }
+.rank-B { color: #7dff8f; }
+.rank-C { color: #b8c0d8; }
+
+/* 王国ランキングのリスト */
+#rankList {
+  list-style: none; width: 100%;
+  font-size: 14px; display: flex; flex-direction: column; gap: 4px;
+  max-height: 46vh; overflow-y: auto;
+}
+#rankList li { display: flex; gap: 8px; padding: 3px 8px; border-radius: 4px; }
+#rankList li .rno { width: 38px; color: #bcd0ff; }
+#rankList li .rname { flex: 1; }
+#rankList li.me { background: rgba(255,225,77,.18); color: #ffe14d; }
+
+/* コマンド欄のスキルボタン（たくけずり・さきよみの書）は紫系で区別 */
+.item.skill { color: #c9a6ff; }
+.item.skill:hover { color: #e7ccff; }
+.item.skill .sub { color: #a98ad8; }
+/* つかえないスキル（未修得・回数切れ・使用済み）はグレーアウト表示 */
+.item.skill.disabled { color: #7a7f9a; }
+.item.skill.disabled:hover { color: #7a7f9a; background: none; }
+.item.skill.disabled .sub { color: #6b7088; }
