@@ -82,6 +82,191 @@ function saveProgress() {
 }
 
 /* ============================================================
+   冒険の途中中断セーブ
+   ------------------------------------------------------------
+   自己ベスト・スキル用のSAVE_KEYとは分けて保存する。
+
+   保存内容:
+     ・勇者のステータス
+     ・現在のエリア
+     ・マップ上の位置
+     ・以前のマップ位置
+     ・保存日時
+============================================================ */
+
+const ADVENTURE_SAVE_PREFIX =
+  "dq_gakushu_adventure_v1";
+
+/*
+ * RevinoでログインしているユーザーIDを取得する。
+ * ユーザーごとに中断データを分ける。
+ */
+function getAdventureOwnerId() {
+  try {
+    const user = JSON.parse(
+      localStorage.getItem("pz_user") || "null"
+    );
+
+    return String(
+      user?.user_id ??
+      user?.userId ??
+      user?.id ??
+      "guest"
+    );
+  } catch (error) {
+    return "guest";
+  }
+}
+
+/*
+ * ユーザーごとの保存キーを作る。
+ */
+function getAdventureSaveKey() {
+  const ownerId = encodeURIComponent(
+    getAdventureOwnerId()
+  );
+
+  return `${ADVENTURE_SAVE_PREFIX}_${ownerId}`;
+}
+
+/*
+ * 中断データを読み込む。
+ */
+function loadAdventureSave() {
+  try {
+    const raw = localStorage.getItem(
+      getAdventureSaveKey()
+    );
+
+    if (!raw) {
+      return null;
+    }
+
+    const data = JSON.parse(raw);
+
+    if (
+      !data ||
+      data.version !== 1 ||
+      !data.player ||
+      !Number.isInteger(Number(data.areaIndex))
+    ) {
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error(
+      "冒険の中断データを読み込めませんでした:",
+      error
+    );
+
+    return null;
+  }
+}
+
+/*
+ * 中断データが存在するか確認する。
+ */
+function hasAdventureSave() {
+  return loadAdventureSave() !== null;
+}
+
+/*
+ * 現在のマップ状態を保存する。
+ */
+function saveAdventureCheckpoint() {
+  if (
+    !player ||
+    !currentArea ||
+    !Number.isInteger(enemyIndex)
+  ) {
+    return false;
+  }
+
+  try {
+    const startPosition =
+      currentArea.walk?.start || {
+        x: 0,
+        y: 0
+      };
+
+    const safeX = Number.isFinite(
+      Number(mapPos?.x)
+    )
+      ? Number(mapPos.x)
+      : Number(startPosition.x);
+
+    const safeY = Number.isFinite(
+      Number(mapPos?.y)
+    )
+      ? Number(mapPos.y)
+      : Number(startPosition.y);
+
+    /*
+     * 現在地も復元用位置一覧へ入れておく。
+     */
+    const savedMapPositions = {
+      ...(lastMapPos || {}),
+      [enemyIndex]: {
+        x: safeX,
+        y: safeY
+      }
+    };
+
+    const saveData = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+
+      areaIndex: enemyIndex,
+
+      mapPos: {
+        x: safeX,
+        y: safeY
+      },
+
+      lastMapPos: savedMapPositions,
+
+      player: player
+    };
+
+    localStorage.setItem(
+      getAdventureSaveKey(),
+      JSON.stringify(saveData)
+    );
+
+    /*
+     * 自己ベストとスキル側も同時に更新する。
+     */
+    saveProgress();
+
+    return true;
+  } catch (error) {
+    console.error(
+      "冒険の中断保存に失敗しました:",
+      error
+    );
+
+    return false;
+  }
+}
+
+/*
+ * 中断データを削除する。
+ */
+function clearAdventureSave() {
+  try {
+    localStorage.removeItem(
+      getAdventureSaveKey()
+    );
+  } catch (error) {
+    console.error(
+      "冒険の中断データを削除できませんでした:",
+      error
+    );
+  }
+}
+
+/* ============================================================
    王国ランキング（擬似ランキング）
    ------------------------------------------------------------
    NPCの固定スコアに、プレイヤーの自己ベストと今の冒険のスコアを
