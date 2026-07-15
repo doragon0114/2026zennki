@@ -41,18 +41,47 @@ function gameClear() {
 
 /* ---- 開始・リトライ ---- */
 // 新規ゲームを開始する（タイトル／ゲームオーバー／クリア画面のどのボタンからも呼ばれる）
+/* ---- 開始・リトライ ---- */
+
 function newGame() {
+  /*
+   * Revinoの問題が読み込めていない場合は開始しない。
+   */
+  if (
+    !Array.isArray(QUESTION_SETS) ||
+    QUESTION_SETS.length === 0
+  ) {
+    alert(
+      "RPGで使用できる問題セットがありません。\n\n" +
+      "Revinoで選択肢付きの問題セットを作成してから、" +
+      "もう一度RPGモードを開いてください。"
+    );
+
+    window.location.href = "/";
+    return;
+  }
+
   player = initPlayer();
-  // 前回までの冒険で覚えたスキルはセーブデータから引き継ぐ（スコアは0から）
-  const sv = loadSave();
-  if (sv.skills) player.skills = sv.skills;
+
+  /*
+   * 前回までに覚えたスキルを引き継ぐ。
+   */
+  const savedData = loadSave();
+
+  if (savedData.skills) {
+    player.skills = savedData.skills;
+  }
+
   lastMapPos = {};
+
   el.title.classList.add("hidden");
   el.gameOver.classList.add("hidden");
   el.clear.classList.add("hidden");
+
   updateStatus();
   opening();
 }
+
 document.getElementById("startBtn").addEventListener("click", newGame);
 document.getElementById("retryBtn").addEventListener("click", newGame);
 document.getElementById("clearRetryBtn").addEventListener("click", newGame);
