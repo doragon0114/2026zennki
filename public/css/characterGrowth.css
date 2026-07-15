@@ -1155,3 +1155,224 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   ドラゴンふれあい機能
+============================================================ */
+
+.growth-page .growth-current-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(108px, 24vw, 132px);
+  height: clamp(108px, 24vw, 132px);
+  margin: 0 auto;
+}
+
+.growth-page .growth-current-avatar .dragon-avatar {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+.growth-page .growth-current-info {
+  min-width: 0;
+}
+
+/* ボタン領域 */
+
+.growth-page .growth-card-actions {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.growth-page .growth-card-actions .growth-action {
+  width: 100%;
+  margin-top: 0;
+}
+
+.growth-page .growth-touch-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff7ed;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.growth-page .growth-touch-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.growth-page .growth-touch-button:active {
+  transform: scale(0.98);
+}
+
+.growth-page .growth-touch-button:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+/* ドラゴンのリアクション */
+
+.growth-page .dragon-touch-reaction {
+  animation:
+    growth-dragon-touch 0.48s ease;
+}
+
+@keyframes growth-dragon-touch {
+  0% {
+    transform: scale(1);
+  }
+
+  30% {
+    transform:
+      translateY(-7px)
+      scale(1.06)
+      rotate(-2deg);
+  }
+
+  60% {
+    transform:
+      translateY(2px)
+      scale(0.98)
+      rotate(2deg);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ハート演出 */
+
+.growth-page .growth-touch-effect {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.growth-page .growth-touch-effect span {
+  --heart-x: 0px;
+  --heart-y: -60px;
+  --heart-delay: 0s;
+
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  color: #fda4af;
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0;
+  text-shadow:
+    0 2px 8px rgba(136, 19, 55, 0.35);
+  transform:
+    translate(-50%, -50%)
+    scale(0.4);
+}
+
+.growth-page .growth-touch-effect.show span {
+  animation:
+    growth-heart-float 0.8s ease-out
+    var(--heart-delay)
+    forwards;
+}
+
+.growth-page .growth-touch-effect span:nth-child(1) {
+  --heart-x: -45px;
+  --heart-y: -55px;
+  --heart-delay: 0s;
+}
+
+.growth-page .growth-touch-effect span:nth-child(2) {
+  --heart-x: -22px;
+  --heart-y: -78px;
+  --heart-delay: 0.05s;
+}
+
+.growth-page .growth-touch-effect span:nth-child(3) {
+  --heart-x: 3px;
+  --heart-y: -88px;
+  --heart-delay: 0.1s;
+}
+
+.growth-page .growth-touch-effect span:nth-child(4) {
+  --heart-x: 28px;
+  --heart-y: -72px;
+  --heart-delay: 0.15s;
+}
+
+.growth-page .growth-touch-effect span:nth-child(5) {
+  --heart-x: 48px;
+  --heart-y: -48px;
+  --heart-delay: 0.2s;
+}
+
+@keyframes growth-heart-float {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      scale(0.3)
+      rotate(-12deg);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(
+        calc(-50% + var(--heart-x)),
+        calc(-50% + var(--heart-y))
+      )
+      scale(1.1)
+      rotate(12deg);
+  }
+}
+
+/* スマートフォン */
+
+@media (max-width: 560px) {
+  .growth-page .current > .growth-current-avatar {
+    margin-top: 2px;
+    margin-bottom: 4px;
+  }
+}
+
+@media (max-width: 420px) {
+  .growth-page .growth-card-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* アニメーション軽減設定 */
+
+@media (prefers-reduced-motion: reduce) {
+  .growth-page .dragon-touch-reaction,
+  .growth-page .growth-touch-effect.show span {
+    animation: none;
+  }
+}
