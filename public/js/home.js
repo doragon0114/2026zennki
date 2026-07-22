@@ -520,10 +520,48 @@ function renderHome() {
 function showNotif() {
   alert('お知らせ\n\n① 田中 太郎さんが対戦を申請しました\n② 新しい問題セットが公開されました\n\n※ プロトタイプのため詳細画面は省略しています');
 }
+
 /* ============================================================
    RPGモードへの移動
+   Revinoの教材・問題を最新化してからRPGへ渡す
 ============================================================ */
 
-function openRpgMode() {
+async function openRpgMode() {
+  try {
+    /*
+     * 問題セット一覧を最新化する。
+     */
+    if (typeof loadMaterialsFromServer === "function") {
+      await loadMaterialsFromServer(true);
+    }
+
+    /*
+     * 問題データを最新化する。
+     */
+    if (typeof loadStudyDataFromServer === "function") {
+      await loadStudyDataFromServer();
+    }
+
+    /*
+     * RPG側から読み込めるようにlocalStorageへ保存する。
+     *
+     * pz_user
+     * pz_materials
+     * pz_questions
+     */
+    if (typeof save === "function") {
+      save();
+    }
+  } catch (error) {
+    /*
+     * 通信に失敗した場合でも、以前保存したデータがあれば
+     * RPG側で読み込めるため、そのまま移動する。
+     */
+    console.error(
+      "RPG用問題データの更新に失敗しました:",
+      error
+    );
+  }
+
   window.location.href = "/rpg/index.html";
 }

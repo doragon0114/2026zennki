@@ -11,7 +11,7 @@
    解説文に答えの単語が入っていても問題ない。
    ============================================================ */
 
-const QUESTION_SETS = [
+const DEFAULT_QUESTION_SETS = [
   {
     id: "math", title: "数学",
     questions: [
@@ -120,27 +120,470 @@ const QUESTION_SETS = [
   },
 ];
 
+/* ============================================================
+   Revinoの問題セット読み込み
+   ------------------------------------------------------------
+   Revino本体がlocalStorageへ保存した以下のデータを使用する。
+
+   pz_materials
+     問題セット一覧
+
+   pz_questions
+     問題一覧
+============================================================ */
+
+/*
+ * localStorageのJSONを安全に読み込む。
+ */
+function readRevinoStorage(key, fallbackValue) {
+  try {
+    const rawValue = localStorage.getItem(key);
+
+    if (!rawValue) {
+      return fallbackValue;
+    }
+
+    return JSON.parse(rawValue);
+  } catch (error) {
+    console.error(
+      `${key}の読み込みに失敗しました:`,
+      error
+    );
+
+    return fallbackValue;
+  }
+}
+
+/*
+ * 問題の選択肢を配列へ変換する。
+ *
+ * 以下の形式に対応する。
+ *
+ * ["選択肢1", "選択肢2"]
+ *
+ * [
+ *   { choiceText: "選択肢1" },
+ *   { choice_text: "選択肢2" }
+ * ]
+ */
+function normalizeRevinoChoices(rawChoices) {
+  let choices = rawChoices;
+
+  /*
+   * choicesがJSON文字列として保存されている場合にも対応する。
+   */
+  if (typeof choices === "string") {
+    try {
+      choices = JSON.parse(choices);
+    } catch {
+      return [];
+    }
+  }
+
+  if (!Array.isArray(choices)) {
+    return [];
+  }
+
+  return choices
+    .map(choice => {
+      if (typeof choice === "string") {
+        return choice.trim();
+      }
+
+      if (!choice || typeof choice !== "object") {
+        return "";
+      }
+
+      return String(
+        choice.choiceText ??
+        choice.choice_text ??
+        choice.text ??
+        choice.label ??
+        ""
+      ).trim();
+    })
+    .filter(Boolean);
+}
+
+/*
+ * choicesの中に正解フラグがある場合、
+ * 正解位置を取得する。
+ */
+function findCorrectChoiceFromObjects(rawChoices) {
+  let choices = rawChoices;
+
+  if (typeof choices === "string") {
+    try {
+      choices = JSON.parse(choices);
+    } catch {
+      return -1;
+    }
+  }
+
+  if (!Array.isArray(choices)) {
+    return -1;
+  }
+
+  return choices.findIndex(choice => {
+    if (!choice || typeof choice !== "object") {
+      return false;
+    }
+
+    return (
+      choice.isCorrect === true ||
+      choice.is_correct === true ||
+      Number(choice.isCorrect) === 1 ||
+      Number(choice.is_correct) === 1
+    );
+  });
+}
+
+/*
+ * 問題の正解位置を取得する。
+ */
+function getRevinoCorrectIndex(question, choices) {
+  const directIndex = Number(
+    question.correct ??
+    question.correctIndex ??
+    question.correct_index ??
+    question.answerIndex ??
+    question.answer_index
+  );
+
+  if (
+    Number.isInteger(directIndex) &&
+    directIndex >= 0 &&
+    directIndex < choices.length
+  ) {
+    return directIndex;
+  }
+
+  /*
+   * 選択肢オブジェクトにisCorrectが付いている形式。
+   */
+  const objectIndex = findCorrectChoiceFromObjects(
+    question.choices
+  );
+
+  if (
+    objectIndex >= 0 &&
+    objectIndex < choices.length
+  ) {
+    return objectIndex;
+  }
+
+  /*
+   * answerがA～Dの場合。
+   */
+  const answerValue = String(
+    question.answer ??
+    question.correctAnswer ??
+    question.correct_answer ??
+    ""
+  ).trim();
+
+  if (/^[A-Da-d]$/.test(answerValue)) {
+    const letterIndex =
+      answerValue.toUpperCase().charCodeAt(0) -
+      "A".charCodeAt(0);
+
+    if (letterIndex < choices.length) {
+      return letterIndex;
+    }
+  }
+
+  /*
+   * answerに正解文字列が入っている場合。
+   */
+  if (answerValue) {
+    const textIndex = choices.findIndex(choice => {
+      return choice === answerValue;
+    });
+
+    if (textIndex >= 0) {
+      return textIndex;
+    }
+  }
+
+  return -1;
+}
+
+/*
+ * Revinoの1問をRPG形式に変換する。
+ *
+ * Revino形式
+ * {
+ *   text,
+ *   choices,
+ *   correct,
+ *   explanation
+ * }
+ *
+ * RPG形式
+ * {
+ *   q,
+ *   c,
+ *   a,
+ *   exp
+ * }
+ */
+function convertRevinoQuestion(question) {
+  const choices = normalizeRevinoChoices(
+    question.choices
+  );
+
+  /*
+   * RPGでは最低2択以上必要。
+   */
+  if (choices.length < 2) {
+    return null;
+  }
+
+  const correctIndex = getRevinoCorrectIndex(
+    question,
+    choices
+  );
+
+  if (
+    correctIndex < 0 ||
+    correctIndex >= choices.length
+  ) {
+    return null;
+  }
+
+  const questionText = String(
+    question.text ??
+    question.questionText ??
+    question.question_text ??
+    ""
+  ).trim();
+
+  if (!questionText) {
+    return null;
+  }
+
+  return {
+    q: questionText,
+    c: choices,
+    a: correctIndex,
+
+    exp: String(
+      question.explanation ??
+      question.exp ??
+      ""
+    ).trim()
+  };
+}
+
+/*
+ * Revinoの教材IDを取得する。
+ */
+function getRevinoMaterialId(material) {
+  return String(
+    material.id ??
+    material.materialId ??
+    material.material_id ??
+    ""
+  );
+}
+
+/*
+ * Revinoの問題が所属する教材IDを取得する。
+ */
+function getRevinoQuestionMaterialId(question) {
+  return String(
+    question.materialId ??
+    question.material_id ??
+    question.material?.id ??
+    ""
+  );
+}
+
+/*
+ * Revinoの問題セットをRPG形式へ変換する。
+ */
+function buildRevinoQuestionSets() {
+  const materials = readRevinoStorage(
+    "pz_materials",
+    []
+  );
+
+  const questions = readRevinoStorage(
+    "pz_questions",
+    []
+  );
+
+  if (
+    !Array.isArray(materials) ||
+    !Array.isArray(questions)
+  ) {
+    return [];
+  }
+
+  return materials
+    .map((material, materialIndex) => {
+      const materialId =
+        getRevinoMaterialId(material);
+
+      if (!materialId) {
+        return null;
+      }
+
+      const convertedQuestions = questions
+        .filter(question => {
+          return (
+            getRevinoQuestionMaterialId(question) ===
+            materialId
+          );
+        })
+        .map(convertRevinoQuestion)
+        .filter(Boolean);
+
+      /*
+       * RPGで使用できる問題がないセットは除外する。
+       */
+      if (convertedQuestions.length === 0) {
+        return null;
+      }
+
+      return {
+        id: materialId,
+
+        title: String(
+          material.name ??
+          material.materialName ??
+          material.material_name ??
+          `問題セット${materialIndex + 1}`
+        ),
+
+        questions: convertedQuestions
+      };
+    })
+    .filter(Boolean);
+}
+
+/*
+ * RPGで実際に使用する問題セット。
+ *
+ * 固定問題ではなく、Revinoのユーザー所持セットのみを使用する。
+ */
+const QUESTION_SETS = buildRevinoQuestionSets();
+
+/*
+ * 読み込み確認用。
+ */
+console.log(
+  "RPGで読み込んだ問題セット:",
+  QUESTION_SETS.map(set => ({
+    id: set.id,
+    title: set.title,
+    questionCount: set.questions.length
+  }))
+);
+
 // セットIDから問題セット本体を引けるようにした対応表
 const QUESTION_SET_MAP = Object.fromEntries(QUESTION_SETS.map(s => [s.id, s]));
 // セットIDから表示名（数学・英語など）への対応表
 const CAT_NAME = Object.fromEntries(QUESTION_SETS.map(s => [s.id, s.title]));
 
 // 出題カテゴリの中からランダムに1問選び、選択肢の順番をシャッフルして返す
-function pickQuestion(categories) {
-  // 敵ごとに設定された教科(cats)の中から、出題する教科を1つ抽選
-  const cat = categories[Math.floor(Math.random() * categories.length)];
-  const pool = QUESTION_SET_MAP[cat].questions;
-  // その教科の問題リストから1問を抽選
-  const base = pool[Math.floor(Math.random() * pool.length)];
-  const correct = base.c[base.a]; // 正解の選択肢の中身（文字列）を先に保持しておく
-  const shuffled = base.c.slice();
-  // Fisher-Yatesアルゴリズムで選択肢の並び順をシャッフル
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+/* ============================================================
+   ユーザー所持セットからランダムに問題を選ぶ
+============================================================ */
+
+function pickQuestion(categories = []) {
+  /*
+   * 敵側に指定されたセットIDと一致するものがあれば、
+   * そのセットを優先する。
+   */
+  const requestedIds = Array.isArray(categories)
+    ? categories.map(String)
+    : [];
+
+  let availableSets = requestedIds
+    .map(id => QUESTION_SET_MAP[id])
+    .filter(set => {
+      return (
+        set &&
+        Array.isArray(set.questions) &&
+        set.questions.length > 0
+      );
+    });
+
+  /*
+   * 敵側のcatsは元の数学・英語などのIDなので、
+   * ユーザーの教材IDと一致しない場合は
+   * ユーザーが持っている全セットから選ぶ。
+   */
+  if (availableSets.length === 0) {
+    availableSets = QUESTION_SETS.filter(set => {
+      return (
+        Array.isArray(set.questions) &&
+        set.questions.length > 0
+      );
+    });
   }
-  // シャッフル後の配列の中から正解の位置を探し直してインデックスとして返す
-  return { q: base.q, c: shuffled, a: shuffled.indexOf(correct), cat, exp: base.exp };
+
+  if (availableSets.length === 0) {
+    return null;
+  }
+
+  /*
+   * 問題セットをランダムに選択。
+   */
+  const selectedSet =
+    availableSets[
+      Math.floor(
+        Math.random() *
+        availableSets.length
+      )
+    ];
+
+  /*
+   * 選択したセットから1問選ぶ。
+   */
+  const baseQuestion =
+    selectedSet.questions[
+      Math.floor(
+        Math.random() *
+        selectedSet.questions.length
+      )
+    ];
+
+  const correctChoice =
+    baseQuestion.c[baseQuestion.a];
+
+  const shuffledChoices =
+    baseQuestion.c.slice();
+
+  /*
+   * 選択肢をシャッフルする。
+   */
+  for (
+    let i = shuffledChoices.length - 1;
+    i > 0;
+    i--
+  ) {
+    const j = Math.floor(
+      Math.random() * (i + 1)
+    );
+
+    [
+      shuffledChoices[i],
+      shuffledChoices[j]
+    ] = [
+      shuffledChoices[j],
+      shuffledChoices[i]
+    ];
+  }
+
+  return {
+    q: baseQuestion.q,
+    c: shuffledChoices,
+    a: shuffledChoices.indexOf(correctChoice),
+    cat: selectedSet.id,
+    exp: baseQuestion.exp || ""
+  };
 }
 
 /* ============================================================

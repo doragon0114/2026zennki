@@ -301,15 +301,43 @@ function enterAreaMap(index, keepPos) {
 // マップ探索中のガイドメッセージとコマンド欄を表示する（お店を出た後や戦闘勝利後などに呼ばれる）
 function resumeRoam() {
   clearMenu();
+
   renderMenu([
-    { label: "地図を クリックして すすもう", disabled: true },
-    { label: "スキルを かくにん", onClick: showSkillList },
+    {
+      label: "地図を クリックして すすもう",
+      disabled: true
+    },
+
+    {
+      label: "スキルを かくにん",
+      onClick: showSkillList
+    },
+
+    {
+      label: "💾 ぼうけんを 中断する",
+      cls: "suspend",
+      onClick: suspendAdventure
+    }
   ]);
-  msgMode = false; el.advance.classList.remove("show");
+
+  msgMode = false;
+  el.advance.classList.remove("show");
+
   el.msgText.innerHTML = currentArea.boss
-    ? `<span class="cat">${currentArea.area}</span><br>不気味な 気配が する…`
-    : `<span class="cat">${currentArea.area}</span><br>どこへ いく？`;
+    ? `
+      <span class="cat">
+        ${currentArea.area}
+      </span><br>
+      不気味な 気配が する…
+    `
+    : `
+      <span class="cat">
+        ${currentArea.area}
+      </span><br>
+      どこへ いく？
+    `;
 }
+
 // つぎのエリアへ移動するメッセージを表示してからマップを切り替える
 function goExit(nextIndex) {
   say([`つぎの まちへ 出発した…`], () => enterAreaMap(nextIndex, false));

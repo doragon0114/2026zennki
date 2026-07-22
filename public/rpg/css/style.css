@@ -313,3 +313,62 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 .item.skill.disabled { color: #7a7f9a; }
 .item.skill.disabled:hover { color: #7a7f9a; background: none; }
 .item.skill.disabled .sub { color: #6b7088; }
+
+/* ============================================================
+   タイトル画面の開始・再開ボタン
+============================================================ */
+
+.title-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(100%, 320px);
+}
+
+.title-actions .btn {
+  width: 100%;
+}
+
+.btn-secondary {
+  background:
+    linear-gradient(
+      180deg,
+      #46506f,
+      #1c243f
+    );
+}
+
+/* ============================================================
+   中断メニュー
+============================================================ */
+
+.item.suspend {
+  color: #ffd18a;
+}
+
+.item.suspend .sub {
+  color: #cfae78;
+}
+
+.item.suspend:hover {
+  color: #ffe8bd;
+  background: rgba(255, 209, 138, 0.1);
+}
+
+/* ============================================================
+   スマートフォン
+============================================================ */
+
+@media (max-width: 480px) {
+  .title-actions {
+    width: 100%;
+  }
+
+  .title-actions .btn {
+    padding:
+      11px
+      16px;
+
+    font-size: 16px;
+  }
+}

@@ -51,6 +51,7 @@ const el = {
   lvText: document.getElementById("lvText"),
   goldText: document.getElementById("goldText"),
   title: document.getElementById("titleScreen"),
+  continueBtn: document.getElementById("continueBtn"),
   gameOver: document.getElementById("gameOverScreen"),
   goStats: document.getElementById("goStats"),
   clear: document.getElementById("clearScreen"),
