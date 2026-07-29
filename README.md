@@ -7,7 +7,7 @@ Node.js + MySQL + Ollama のDocker環境を構築しました
 - Ollama (qwen2.5:3b)
 
 ## チームメンバーの起動手順
-1. `.env` ファイルを作成（内容のAPIキーは別途個人で用意してもらう）
+1. `.env` ファイルを作成（内容のAPIキーはテンプレートを編集して別途個人で用意してもらう）
 2. `docker-compose up -d` を実行
 3. `docker compose exec ollama ollama pull qwen2.5:3b`を実行
 4. `http://localhost:3000` にアクセス
@@ -17,3 +17,4 @@ Node.js + MySQL + Ollama のDocker環境を構築しました
 
 ## docker内のMyssql入り方
 docker compose exec mysql bash
+Mysqlに入ったのち、RevinoDB.sqlをコピペして実行する
