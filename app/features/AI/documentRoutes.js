@@ -169,7 +169,7 @@ function enqueueDocumentJob(jobId, runner) {
             45,
 
           message:
-            "AI問題生成中です",
+            "AI問題生成・Gemini確認中です",
 
           queuePosition:
             0,
@@ -198,7 +198,7 @@ function enqueueDocumentJob(jobId, runner) {
             45,
 
           message:
-            "AI問題生成中です",
+            "AI問題生成・Gemini確認中です",
 
           queuePosition:
             0,

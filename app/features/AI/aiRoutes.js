@@ -5,6 +5,10 @@ const http = require("http");
 const https = require("https");
 const db = require("../DB/dbRoutes");
 
+const {
+  reviewQuestionsWithGemini
+} = require("./geminiQuestionReviewer");
+
 const OLLAMA_WAIT_TIMEOUT_MS =
   60 * 60 * 1000;
 
@@ -846,6 +850,62 @@ router.post("/generate", async (req, res) => {
       );
     }
 
+    /* ============================================================
+      Geminiで問題を解答・検証・訂正
+      ------------------------------------------------------------
+      Ollamaで生成した問題をMySQLへ保存する前に、
+      Geminiへ資料本文と一緒に渡す。
+
+      Geminiが確認する内容:
+      ・正解ラベルが正しいか
+      ・問題文と選択肢が成立しているか
+      ・正解が1つに定まるか
+      ・資料本文に根拠があるか
+      ・選択肢が重複していないか
+      ・解説が正しいか
+    ============================================================ */
+
+    const geminiReviewResult =
+      await reviewQuestionsWithGemini({
+        sourceText:
+          promptSourceText,
+
+        questions:
+          generatedQuestions.slice(
+            0,
+            5
+          )
+      });
+
+    /*
+    * Geminiが訂正した問題で元の問題を置き換える。
+    */
+    generatedQuestions =
+      geminiReviewResult.questions;
+
+    /*
+    * フロントへ返す確認結果。
+    */
+    const geminiReview =
+      geminiReviewResult.review;
+
+    console.log(
+      "QUESTION_REVIEW_COMPLETE:",
+      {
+        status:
+          geminiReview.status,
+
+        model:
+          geminiReview.model,
+
+        changedCount:
+          geminiReview.changedCount
+      }
+    );
+
+    /*
+    * Gemini確認後の問題をDB保存形式へ変換する。
+    */
     const normalized =
       generatedQuestions
         .slice(0, 5)
@@ -968,9 +1028,24 @@ router.post("/generate", async (req, res) => {
 
     res.json({
       ok: true,
+
       materialId,
-      categoryId: finalCategoryId,
-      questions: normalized,
+
+      categoryId:
+        finalCategoryId,
+
+      /*
+      * Gemini確認後の問題。
+      */
+      questions:
+        normalized,
+
+      /*
+      * Geminiによる訂正結果。
+      */
+      review:
+        geminiReview,
+
       saved
     });
   } catch (err) {
